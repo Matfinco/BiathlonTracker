@@ -4,11 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <!-- Meta tag per farla comportare da vera app nativa su iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     
     <title>Biathlon Tracker</title>
+    
+    <!-- Libreria per la creazione di file ZIP in locale -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
     <style>
         :root {
             --bg: #1e1e1e;
@@ -33,7 +36,6 @@
         }
         body.review-mode { background-color: var(--review-bg); }
         
-        /* --- HEADER & CONTROLS --- */
         .header {
             display: flex; justify-content: space-between; align-items: center;
             font-size: 18px; font-weight: bold; margin-bottom: 15px; margin-top: 10px;
@@ -47,30 +49,23 @@
             background-color: #333; color: white; flex: 1; min-width: 120px;
         }
         button { background-color: var(--accent); font-weight: bold; cursor: pointer; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
         button.secondary { background-color: #555; }
         button.danger { background-color: #d32f2f; }
         button.warning { background-color: #ff9800; color: white; }
+        button.success { background-color: #34c759; color: white; }
         
-        /* Classe specifica per i pulsanti di eliminazione quadrati */
         .btn-delete {
-            width: 36px;
-            height: 36px;
-            padding: 0 !important;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex: 0 0 auto !important;
-            min-width: unset !important;
+            width: 36px; height: 36px; padding: 0 !important; display: flex;
+            justify-content: center; align-items: center; flex: 0 0 auto !important; min-width: unset !important;
         }
         
-        /* --- TARGET AREA --- */
         .target-container { display: flex; justify-content: center; align-items: center; margin: 10px 0; }
         
         .target-box {
             width: 100%; max-width: 420px; aspect-ratio: 1 / 1.1; 
             background-color: var(--target-box); position: relative;
-            border-radius: 8px; overflow: hidden; border: 1px solid #444; 
-            touch-action: none;
+            border-radius: 8px; overflow: hidden; border: 1px solid #444; touch-action: none;
         }
         
         .target-center {
@@ -83,7 +78,6 @@
         .target-prone { width: 39.1%; aspect-ratio: 1 / 1; border: 1.5px solid rgba(255,255,255,0.6); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         .target-dot { width: 4px; height: 4px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-        /* --- SHOTS --- */
         .shot {
             width: 22px; height: 22px; background-color: var(--shot-color);
             border-radius: 50%; position: absolute; transform: translate(-50%, -50%);
@@ -96,7 +90,6 @@
         .slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
         .slider-container span { min-width: 60px; text-align: center; font-weight: bold; }
 
-        /* --- MODALS --- */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
@@ -113,7 +106,6 @@
         .list-item-btns { display: flex; gap: 5px; align-items: center; }
         .list-item-btns button:not(.btn-delete) { padding: 6px 10px; min-width: auto; font-size: 12px; }
         .add-athlete-row { display: flex; gap: 10px; }
-        
         .hidden { display: none !important; }
     </style>
 </head>
@@ -163,7 +155,7 @@
 
     <!-- Controlli Review Mode -->
     <div class="controls hidden" id="review-controls">
-        <button class="secondary" onclick="exportImage()">Esp. Immagine Storico</button>
+        <button class="secondary" onclick="exportImage()">Condividi Immagine</button>
         <button style="background-color: #fff; color: #000;" onclick="exitReviewMode()">⬅ Torna all'Allenamento</button>
     </div>
 
@@ -178,8 +170,9 @@
             </div>
             
             <h3 style="margin-top: 20px;">Dati App</h3>
+            <button class="success" id="btn-export-zip" onclick="exportFullSession()">📥 Esporta Tutta la Sessione (ZIP)</button>
             <button class="warning" onclick="newSession()">🔄 Nuova Sessione (Mantieni Atleti)</button>
-            <button class="danger" onclick="factoryReset()" style="margin-top: 10px;">⚠️ Cancella Tutti i Dati (Reset Totale)</button>
+            <button class="danger" onclick="factoryReset()" style="margin-top: 10px;">⚠️ Cancella Tutti i Dati</button>
             <button class="secondary" onclick="closeSettings()" style="margin-top: 10px;">Chiudi</button>
         </div>
     </div>
@@ -218,17 +211,12 @@
             slider.addEventListener('input', updateVisualsFromSlider);
         }
 
-        function getActiveShots() {
-            return state.reviewMode ? state.reviewMode.shots : state.currentShots;
-        }
+        function getActiveShots() { return state.reviewMode ? state.reviewMode.shots : state.currentShots; }
 
         function saveState() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                athletes: state.athletes,
-                currentAthleteId: state.currentAthleteId,
-                currentPos: state.currentPos,
-                currentShots: state.currentShots,
-                history: state.history
+                athletes: state.athletes, currentAthleteId: state.currentAthleteId,
+                currentPos: state.currentPos, currentShots: state.currentShots, history: state.history
             }));
             if(!state.reviewMode) updateSliderMax();
         }
@@ -238,10 +226,8 @@
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    state.athletes = parsed.athletes || [];
-                    state.currentAthleteId = parsed.currentAthleteId;
-                    state.currentPos = parsed.currentPos || 'T';
-                    state.currentShots = parsed.currentShots || [];
+                    state.athletes = parsed.athletes || []; state.currentAthleteId = parsed.currentAthleteId;
+                    state.currentPos = parsed.currentPos || 'T'; state.currentShots = parsed.currentShots || [];
                     state.history = parsed.history || [];
                     
                     if(!state.athletes.length) forceDefaultAthlete();
@@ -254,12 +240,8 @@
                         }
                     });
                 } catch (e) { forceDefaultAthlete(); }
-            } else {
-                forceDefaultAthlete();
-            }
-            if(!state.athletes.find(a => a.id === state.currentAthleteId)) {
-                state.currentAthleteId = state.athletes[0].id;
-            }
+            } else { forceDefaultAthlete(); }
+            if(!state.athletes.find(a => a.id === state.currentAthleteId)) state.currentAthleteId = state.athletes[0].id;
         }
 
         function forceDefaultAthlete() {
@@ -276,14 +258,8 @@
                 athleteSelect.appendChild(opt);
             });
             
-            athleteSelect.onchange = (e) => {
-                state.currentAthleteId = parseInt(e.target.value);
-                saveState(); updateHeader();
-            };
-
-            updateHeader();
-            renderShotsFromState();
-            toggleReviewUI();
+            athleteSelect.onchange = (e) => { state.currentAthleteId = parseInt(e.target.value); saveState(); updateHeader(); };
+            updateHeader(); renderShotsFromState(); toggleReviewUI();
         }
 
         function updateHeader() {
@@ -300,19 +276,14 @@
             document.getElementById('btn-position').textContent = `Posizione: ${state.currentPos}`;
         }
 
-        function togglePosition() {
-            state.currentPos = state.currentPos === 'T' ? 'P' : 'T';
-            saveState(); updateHeader();
-        }
+        function togglePosition() { state.currentPos = state.currentPos === 'T' ? 'P' : 'T'; saveState(); updateHeader(); }
 
         function toggleReviewUI() {
             const isReview = state.reviewMode !== null;
             document.body.classList.toggle('review-mode', isReview);
-            
             document.getElementById('normal-controls-1').classList.toggle('hidden', isReview);
             document.getElementById('normal-controls-2').classList.toggle('hidden', isReview);
             document.getElementById('header-btns').classList.toggle('hidden', isReview);
-            
             document.getElementById('review-controls').classList.toggle('hidden', !isReview);
         }
 
@@ -320,9 +291,7 @@
             const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
             document.getElementById('history-athlete-name').textContent = athlete.name;
             
-            const list = document.getElementById('modal-history-list');
-            list.innerHTML = '';
-            
+            const list = document.getElementById('modal-history-list'); list.innerHTML = '';
             const athleteHistory = state.history.filter(h => h.athleteId === athlete.id).reverse();
             
             if(athleteHistory.length === 0) {
@@ -334,14 +303,8 @@
                     const dateStr = `${date.getDate()}/${date.getMonth()+1} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
                     
                     li.innerHTML = `
-                        <div class="list-item-info">
-                            <strong>Serie ${h.series}</strong>
-                            <span class="list-item-date">${dateStr} - ${h.shots.length} colpi</span>
-                        </div>
-                        <div class="list-item-btns">
-                            <button onclick="viewHistoryItem(${h.id})">Apri</button>
-                            <button class="danger btn-delete" onclick="deleteHistoryItem(${h.id})">X</button>
-                        </div>
+                        <div class="list-item-info"><strong>Serie ${h.series}</strong><span class="list-item-date">${dateStr} - ${h.shots.length} colpi</span></div>
+                        <div class="list-item-btns"><button onclick="viewHistoryItem(${h.id})">Apri</button><button class="danger btn-delete" onclick="deleteHistoryItem(${h.id})">X</button></div>
                     `;
                     list.appendChild(li);
                 });
@@ -350,31 +313,13 @@
         }
 
         function closeHistory() { document.getElementById('history-modal').style.display = 'none'; }
-
-        function deleteHistoryItem(id) {
-            if(!confirm("Eliminare questa serie dallo storico?")) return;
-            state.history = state.history.filter(h => h.id !== id);
-            saveState();
-            openHistory(); 
-        }
-
-        function viewHistoryItem(id) {
-            const item = state.history.find(h => h.id === id);
-            if(!item) return;
-            state.reviewMode = item;
-            closeHistory();
-            refreshInterface();
-        }
-
-        function exitReviewMode() {
-            state.reviewMode = null;
-            refreshInterface();
-        }
+        function deleteHistoryItem(id) { if(!confirm("Eliminare?")) return; state.history = state.history.filter(h => h.id !== id); saveState(); openHistory(); }
+        function viewHistoryItem(id) { const item = state.history.find(h => h.id === id); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
+        function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
 
         function openSettings() {
             document.getElementById('settings-modal').style.display = 'flex';
-            const list = document.getElementById('modal-athlete-list');
-            list.innerHTML = '';
+            const list = document.getElementById('modal-athlete-list'); list.innerHTML = '';
             state.athletes.forEach(a => {
                 const li = document.createElement('li'); li.className = 'list-item';
                 li.innerHTML = `<span>${a.name}</span> <button class="danger btn-delete" onclick="removeAthlete(${a.id})">X</button>`;
@@ -384,206 +329,177 @@
         function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
         
         function addAthlete() {
-            const input = document.getElementById('new-athlete-name');
-            const name = input.value.trim();
-            if(!name) return;
-            state.athletes.push({ id: Date.now(), name: name, seriesT: 1, seriesP: 1 });
+            const input = document.getElementById('new-athlete-name'); const name = input.value.trim();
+            if(!name) return; state.athletes.push({ id: Date.now(), name: name, seriesT: 1, seriesP: 1 });
             input.value = ''; saveState(); openSettings(); refreshInterface();
         }
-
         function removeAthlete(id) {
             if(state.athletes.length <= 1) return alert("Devi avere almeno un atleta.");
-            if(!confirm("Eliminare questo atleta e tutto il suo storico?")) return;
-            state.athletes = state.athletes.filter(a => a.id !== id);
-            state.history = state.history.filter(h => h.athleteId !== id);
+            if(!confirm("Eliminare?")) return;
+            state.athletes = state.athletes.filter(a => a.id !== id); state.history = state.history.filter(h => h.athleteId !== id);
             if(state.currentAthleteId === id) state.currentAthleteId = state.athletes[0].id;
             saveState(); openSettings(); refreshInterface();
         }
 
         function newSession() {
-            if(!confirm("Vuoi iniziare una nuova sessione di allenamento?\n\nQuesto cancellerà tutto lo storico dei colpi ma MANTERRÀ la tua lista atleti.\nI contatori delle serie ripartiranno da 1.")) return;
-            
-            // Svuota storico e colpi correnti
-            state.history = [];
-            state.currentShots = [];
-            state.reviewMode = null;
-            
-            // Resetta i contatori di tutti gli atleti
-            state.athletes.forEach(a => {
-                a.seriesT = 1;
-                a.seriesP = 1;
-            });
-            
-            saveState();
-            refreshInterface();
-            closeSettings();
+            if(!confirm("Vuoi iniziare una nuova sessione?\nI colpi verranno cancellati, gli atleti rimarranno.")) return;
+            state.history = []; state.currentShots = []; state.reviewMode = null;
+            state.athletes.forEach(a => { a.seriesT = 1; a.seriesP = 1; });
+            saveState(); refreshInterface(); closeSettings();
         }
-
         function factoryReset() {
-            if(!confirm("ATTENZIONE: Questo cancellerà tutti gli atleti e lo storico. Procedere?")) return;
-            localStorage.removeItem(STORAGE_KEY);
-            state.currentShots = []; state.history = []; state.reviewMode = null;
+            if(!confirm("ATTENZIONE: Reset totale?")) return;
+            localStorage.removeItem(STORAGE_KEY); state.currentShots = []; state.history = []; state.reviewMode = null;
             loadState(); refreshInterface(); closeSettings();
         }
 
         targetEl.addEventListener('pointerdown', (e) => {
             if(state.reviewMode) return; 
-
-            if (e.target.classList.contains('shot')) {
-                draggedShot = e.target;
-                targetEl.setPointerCapture(e.pointerId);
-            } else if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
-                if (parseInt(slider.value) < state.currentShots.length) {
-                    slider.value = state.currentShots.length; updateVisualsFromSlider();
-                }
+            if (e.target.classList.contains('shot')) { draggedShot = e.target; targetEl.setPointerCapture(e.pointerId); } 
+            else if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
+                if (parseInt(slider.value) < state.currentShots.length) { slider.value = state.currentShots.length; updateVisualsFromSlider(); }
                 if (state.currentShots.length >= MAX_SHOTS) return;
-
-                const rect = targetEl.getBoundingClientRect();
-                createShot(e.clientX - rect.left, e.clientY - rect.top);
+                const rect = targetEl.getBoundingClientRect(); createShot(e.clientX - rect.left, e.clientY - rect.top);
             }
         });
-
         targetEl.addEventListener('pointermove', (e) => {
             if (draggedShot && !state.reviewMode) {
                 const rect = targetEl.getBoundingClientRect();
-                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-                let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
-
+                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width)); let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
                 draggedShot.style.left = `${x}px`; draggedShot.style.top = `${y}px`;
-                const seq = parseInt(draggedShot.dataset.seq);
-                state.currentShots[seq - 1].x = x; state.currentShots[seq - 1].y = y;
+                state.currentShots[parseInt(draggedShot.dataset.seq) - 1].x = x; state.currentShots[parseInt(draggedShot.dataset.seq) - 1].y = y;
             }
         });
-
-        targetEl.addEventListener('pointerup', (e) => {
-            if (draggedShot) { targetEl.releasePointerCapture(e.pointerId); draggedShot = null; saveState(); }
-        });
+        targetEl.addEventListener('pointerup', (e) => { if (draggedShot) { targetEl.releasePointerCapture(e.pointerId); draggedShot = null; saveState(); } });
 
         function createShot(x, y) {
             const seq = state.currentShots.length + 1;
             state.currentShots.push({ seq, x, y, bx: targetEl.offsetWidth, by: targetEl.offsetHeight });
-            saveState(); appendShotDOM(seq, x, y);
-            slider.value = state.currentShots.length; updateVisualsFromSlider();
+            saveState(); appendShotDOM(seq, x, y); slider.value = state.currentShots.length; updateVisualsFromSlider();
         }
 
         function appendShotDOM(seq, x, y) {
-            const shotEl = document.createElement('div');
-            shotEl.className = 'shot'; shotEl.dataset.seq = seq;
-            shotEl.style.left = `${x}px`; shotEl.style.top = `${y}px`;
-            shotEl.textContent = seq;
-            targetEl.appendChild(shotEl);
+            const shotEl = document.createElement('div'); shotEl.className = 'shot'; shotEl.dataset.seq = seq;
+            shotEl.style.left = `${x}px`; shotEl.style.top = `${y}px`; shotEl.textContent = seq; targetEl.appendChild(shotEl);
         }
 
         function renderShotsFromState() {
-            targetEl.querySelectorAll('.shot').forEach(s => s.remove());
-            const shots = getActiveShots();
-            
+            targetEl.querySelectorAll('.shot').forEach(s => s.remove()); const shots = getActiveShots();
             shots.forEach(s => {
-                const currentW = targetEl.offsetWidth;
-                const currentH = targetEl.offsetHeight;
-                const scaleX = s.bx ? (currentW / s.bx) : 1;
-                const scaleY = s.by ? (currentH / s.by) : 1;
-                
-                let renderX = s.x * scaleX; 
-                let renderY = s.y * scaleY;
-                
-                if(!state.reviewMode) {
-                    s.x = renderX; s.y = renderY; s.bx = currentW; s.by = currentH;
-                }
+                const currentW = targetEl.offsetWidth; const currentH = targetEl.offsetHeight;
+                const scaleX = s.bx ? (currentW / s.bx) : 1; const scaleY = s.by ? (currentH / s.by) : 1;
+                let renderX = s.x * scaleX; let renderY = s.y * scaleY;
+                if(!state.reviewMode) { s.x = renderX; s.y = renderY; s.bx = currentW; s.by = currentH; }
                 appendShotDOM(s.seq, renderX, renderY);
             });
-            slider.value = shots.length;
-            updateSliderMax(); updateVisualsFromSlider();
+            slider.value = shots.length; updateSliderMax(); updateVisualsFromSlider();
         }
 
-        function updateSliderMax() {
-            const shots = getActiveShots();
-            slider.max = shots.length;
-            sliderVal.textContent = `${slider.value} / ${shots.length}`;
-        }
-
+        function updateSliderMax() { slider.max = getActiveShots().length; sliderVal.textContent = `${slider.value} / ${getActiveShots().length}`; }
         function updateVisualsFromSlider() {
-            const visibleCount = parseInt(slider.value);
-            const shots = getActiveShots();
-            sliderVal.textContent = `${visibleCount} / ${shots.length}`;
-            targetEl.querySelectorAll('.shot').forEach(shotEl => {
-                shotEl.style.display = parseInt(shotEl.dataset.seq) <= visibleCount ? 'flex' : 'none';
-            });
+            const visibleCount = parseInt(slider.value); sliderVal.textContent = `${visibleCount} / ${getActiveShots().length}`;
+            targetEl.querySelectorAll('.shot').forEach(shotEl => { shotEl.style.display = parseInt(shotEl.dataset.seq) <= visibleCount ? 'flex' : 'none'; });
         }
-
-        function clearTargetAndState() {
-            state.currentShots = []; saveState(); renderShotsFromState();
-        }
+        function clearTargetAndState() { state.currentShots = []; saveState(); renderShotsFromState(); }
 
         function saveSeries() {
             if (state.currentShots.length === 0) return alert("Nessun colpo.");
             const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
-            
             state.history.push({
-                id: Date.now(),
-                athleteId: athlete.id,
-                athlete: athlete.name, 
-                position: state.currentPos,
+                id: Date.now(), athleteId: athlete.id, athlete: athlete.name, position: state.currentPos,
                 series: `${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}`,
-                shots: JSON.parse(JSON.stringify(state.currentShots)), 
-                timestamp: new Date().toISOString()
+                shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: new Date().toISOString()
             });
-
             if (state.currentPos === 'T') athlete.seriesT++; else athlete.seriesP++;
             clearTargetAndState(); updateHeader();
         }
 
+        function generateCanvasBlob(shots, w, h) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, w, h);
+                const cx = w / 2; const cy = h / 2; const targetRadius = (w * 0.90) / 2; 
+                ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(cx, cy, targetRadius, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - targetRadius, cy); ctx.lineTo(cx + targetRadius, cy); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx, cy - targetRadius); ctx.lineTo(cx, cy + targetRadius); ctx.stroke();
+                ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, targetRadius * 0.391, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+
+                for(let i=0; i < shots.length; i++) {
+                    const s = shots[i];
+                    ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(s.x, s.y, 11, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s.seq.toString(), s.x, s.y);
+                }
+                canvas.toBlob(resolve, 'image/png');
+            });
+        }
+
         function exportImage() {
-            const canvas = document.createElement('canvas');
             const w = targetEl.offsetWidth; const h = targetEl.offsetHeight;
-            canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext('2d');
+            generateCanvasBlob(getActiveShots().slice(0, parseInt(slider.value)), w, h).then(blob => {
+                let fileName = state.reviewMode ? `${state.reviewMode.athlete}_storico_${state.reviewMode.series}.png` : `${state.athletes.find(a => a.id === state.currentAthleteId).name}_${state.currentPos === 'T' ? state.athletes.find(a => a.id === state.currentAthleteId).seriesT : state.athletes.find(a => a.id === state.currentAthleteId).seriesP}${state.currentPos}.png`;
+                const file = new File([blob], fileName, { type: "image/png" });
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    navigator.share({ files: [file], title: 'Serie Biathlon' }).catch(e => console.log('Condivisione annullata', e));
+                } else {
+                    const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.download = fileName; link.href = url; link.click(); URL.revokeObjectURL(url);
+                }
+            });
+        }
 
-            ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, w, h);
-            const cx = w / 2; const cy = h / 2;
-            const targetRadius = (w * 0.90) / 2; 
-            
-            ctx.fillStyle = '#1a1a1a';
-            ctx.beginPath(); ctx.arc(cx, cy, targetRadius, 0, Math.PI * 2); ctx.fill();
+        async function exportFullSession() {
+            if (typeof JSZip === 'undefined') return alert("Libreria ZIP non caricata. Assicurati di essere connesso a internet e riavvia l'app.");
+            if (state.history.length === 0) return alert("Nessuna serie salvata nello storico.");
 
-            ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
-            ctx.beginPath(); ctx.moveTo(cx - targetRadius, cy); ctx.lineTo(cx + targetRadius, cy); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx, cy - targetRadius); ctx.lineTo(cx, cy + targetRadius); ctx.stroke();
+            const btn = document.getElementById('btn-export-zip');
+            const originalText = btn.textContent;
+            btn.textContent = "⏳ Generazione ZIP in corso..."; btn.disabled = true;
 
-            ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.arc(cx, cy, targetRadius * 0.391, 0, Math.PI * 2); ctx.stroke();
+            try {
+                const zip = new JSZip();
+                // Formatta la data (YYYY-MM-DD)
+                const dateStr = new Date().toISOString().split('T')[0];
+                const rootName = `Sessione_${dateStr}`;
+                const rootFolder = zip.folder(rootName);
 
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+                // Dimensioni fisse ideali per le immagini salvate in background per evitare distorsioni
+                const exportW = 400; const exportH = 440; 
 
-            const visibleCount = parseInt(slider.value);
-            const shots = getActiveShots();
-            
-            for(let i=0; i < visibleCount; i++) {
-                const s = shots[i];
-                ctx.fillStyle = '#ff3b30';
-                ctx.beginPath(); ctx.arc(s.x, s.y, 11, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
-                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px sans-serif';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(s.seq.toString(), s.x, s.y);
+                for (const h of state.history) {
+                    const athleteFolder = rootFolder.folder(h.athlete);
+                    
+                    // Ricalcoliamo le posizioni dei colpi in base alla dimensione fissa ideale
+                    const normalizedShots = h.shots.map(s => {
+                        const scaleX = s.bx ? (exportW / s.bx) : 1;
+                        const scaleY = s.by ? (exportH / s.by) : 1;
+                        return { seq: s.seq, x: s.x * scaleX, y: s.y * scaleY };
+                    });
+
+                    const blob = await generateCanvasBlob(normalizedShots, exportW, exportH);
+                    athleteFolder.file(`Serie_${h.series}.png`, blob);
+                }
+
+                const zipBlob = await zip.generateAsync({type:"blob"});
+                const zipFile = new File([zipBlob], `${rootName}.zip`, { type: "application/zip" });
+
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [zipFile] })) {
+                    await navigator.share({ files: [zipFile], title: `Esportazione Sessione Biathlon` });
+                } else {
+                    const url = URL.createObjectURL(zipBlob);
+                    const link = document.createElement('a');
+                    link.download = `${rootName}.zip`; link.href = url; link.click();
+                    URL.revokeObjectURL(url);
+                }
+            } catch(e) {
+                console.error(e); alert("Errore durante l'esportazione.");
+            } finally {
+                btn.textContent = originalText; btn.disabled = false;
             }
-
-            const link = document.createElement('a');
-            
-            if(state.reviewMode) {
-                link.download = `${state.reviewMode.athlete}_storico_${state.reviewMode.series}.png`;
-            } else {
-                const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
-                const sName = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
-                link.download = `${athlete.name}_${sName}${state.currentPos}.png`;
-            }
-            
-            link.href = canvas.toDataURL('image/png'); link.click();
         }
 
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
-
         init();
     </script>
 </body>
