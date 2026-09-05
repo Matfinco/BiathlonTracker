@@ -21,7 +21,6 @@
         }
         body {
             margin: 0; 
-            /* Uso padding con le safe-area di Apple per evitare sovrapposizioni e sfocature con il notch/Dynamic Island */
             padding: env(safe-area-inset-top, 15px) env(safe-area-inset-right, 15px) env(safe-area-inset-bottom, 15px) env(safe-area-inset-left, 15px); 
             background-color: var(--bg); 
             color: var(--text);
@@ -30,7 +29,6 @@
             flex-direction: column; 
             min-height: 100vh; 
             box-sizing: border-box; 
-            /* Il blocco dello scorrimento sul body è stato rimosso per permettere lo scroll in orizzontale */
             transition: background-color 0.3s;
         }
         body.review-mode { background-color: var(--review-bg); }
@@ -51,6 +49,7 @@
         button { background-color: var(--accent); font-weight: bold; cursor: pointer; }
         button.secondary { background-color: #555; }
         button.danger { background-color: #d32f2f; }
+        button.warning { background-color: #ff9800; color: white; }
         
         /* Classe specifica per i pulsanti di eliminazione quadrati */
         .btn-delete {
@@ -71,7 +70,6 @@
             width: 100%; max-width: 420px; aspect-ratio: 1 / 1.1; 
             background-color: var(--target-box); position: relative;
             border-radius: 8px; overflow: hidden; border: 1px solid #444; 
-            /* Blocco il touch solo sul bersaglio, così puoi fare drag senza scorrere la pagina per sbaglio */
             touch-action: none;
         }
         
@@ -178,8 +176,10 @@
                 <input type="text" id="new-athlete-name" placeholder="Nome atleta...">
                 <button onclick="addAthlete()">Aggiungi</button>
             </div>
+            
             <h3 style="margin-top: 20px;">Dati App</h3>
-            <button class="danger" onclick="factoryReset()">⚠️ Cancella Tutti i Dati</button>
+            <button class="warning" onclick="newSession()">🔄 Nuova Sessione (Mantieni Atleti)</button>
+            <button class="danger" onclick="factoryReset()" style="margin-top: 10px;">⚠️ Cancella Tutti i Dati (Reset Totale)</button>
             <button class="secondary" onclick="closeSettings()" style="margin-top: 10px;">Chiudi</button>
         </div>
     </div>
@@ -398,6 +398,25 @@
             state.history = state.history.filter(h => h.athleteId !== id);
             if(state.currentAthleteId === id) state.currentAthleteId = state.athletes[0].id;
             saveState(); openSettings(); refreshInterface();
+        }
+
+        function newSession() {
+            if(!confirm("Vuoi iniziare una nuova sessione di allenamento?\n\nQuesto cancellerà tutto lo storico dei colpi ma MANTERRÀ la tua lista atleti.\nI contatori delle serie ripartiranno da 1.")) return;
+            
+            // Svuota storico e colpi correnti
+            state.history = [];
+            state.currentShots = [];
+            state.reviewMode = null;
+            
+            // Resetta i contatori di tutti gli atleti
+            state.athletes.forEach(a => {
+                a.seriesT = 1;
+                a.seriesP = 1;
+            });
+            
+            saveState();
+            refreshInterface();
+            closeSettings();
         }
 
         function factoryReset() {
