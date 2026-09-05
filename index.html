@@ -9,162 +9,174 @@
             --bg: #1e1e1e;
             --text: #ffffff;
             --accent: #007aff;
-            --target-box: #ffffff;
-            --target-center: #000000;
+            --target-box: #f5f5f5;
+            --target-center: #1a1a1a;
             --shot-color: #ff3b30;
+            --review-bg: #8b4513; /* Colore per indicare la modalità storico */
         }
         body {
-            margin: 0;
-            padding: 15px;
-            background-color: var(--bg);
-            color: var(--text);
+            margin: 0; padding: 15px; background-color: var(--bg); color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            box-sizing: border-box;
-            touch-action: none;
+            display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; touch-action: none;
+            transition: background-color 0.3s;
         }
+        body.review-mode { background-color: var(--review-bg); }
+        
+        /* --- HEADER & CONTROLS --- */
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 18px; font-weight: bold; margin-bottom: 15px;
         }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
+        .header-btns { display: flex; gap: 5px; }
+        .header-btns button { padding: 8px 12px; font-size: 14px; min-width: auto; }
+        
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        select, button, input[type="range"], input[type="text"] {
+            padding: 12px; font-size: 14px; border-radius: 8px; border: none;
+            background-color: #333; color: white; flex: 1; min-width: 120px;
         }
-        select, button, input[type="range"] {
-            padding: 12px;
-            font-size: 14px;
-            border-radius: 8px;
-            border: none;
-            background-color: #333;
-            color: white;
-            flex: 1;
-            min-width: 120px;
-        }
-        button {
-            background-color: var(--accent);
-            font-weight: bold;
-            cursor: pointer;
-        }
-        button.secondary {
-            background-color: #555;
-        }
-        button.danger {
-            background-color: #d32f2f;
-        }
-        .target-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 10px 0;
-        }
-        /* Il quadrato bianco per i colpi sbagliati */
+        button { background-color: var(--accent); font-weight: bold; cursor: pointer; }
+        button.secondary { background-color: #555; }
+        button.danger { background-color: #d32f2f; }
+        
+        /* --- TARGET AREA --- */
+        .target-container { display: flex; justify-content: center; align-items: center; margin: 10px 0; }
+        
         .target-box {
-            width: 320px;
-            height: 320px;
-            background-color: var(--target-box);
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 2px solid #555;
-            touch-action: none;
+            width: 100%; max-width: 420px; aspect-ratio: 1 / 1.1; 
+            background-color: var(--target-box); position: relative;
+            border-radius: 8px; overflow: hidden; border: 1px solid #444; touch-action: none;
         }
-        /* Il bersaglio nero centrale */
+        
         .target-center {
-            width: 150px;
-            height: 150px;
-            background-color: var(--target-center);
-            border-radius: 50%;
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none; /* Lascia passare i click al contenitore */
+            width: 90%; aspect-ratio: 1 / 1; background-color: var(--target-center);
+            border-radius: 50%; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); pointer-events: none;
         }
+        .target-cross-h { width: 100%; height: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 50%; left: 0; }
+        .target-cross-v { height: 100%; width: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 0; left: 50%; }
+        .target-prone { width: 39.1%; aspect-ratio: 1 / 1; border: 1.5px solid rgba(255,255,255,0.6); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .target-dot { width: 4px; height: 4px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+        /* --- SHOTS --- */
         .shot {
-            width: 24px;
-            height: 24px;
-            background-color: var(--shot-color);
-            border-radius: 50%;
-            position: absolute;
-            transform: translate(-50%, -50%);
-            border: 2px solid white;
-            cursor: grab;
-            z-index: 10;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-            user-select: none;
+            width: 22px; height: 22px; background-color: var(--shot-color);
+            border-radius: 50%; position: absolute; transform: translate(-50%, -50%);
+            border: 2px solid white; cursor: grab; z-index: 10;
+            display: flex; justify-content: center; align-items: center;
+            color: white; font-size: 11px; font-weight: bold; user-select: none;
         }
-        .shot:active {
-            cursor: grabbing;
-            transform: translate(-50%, -50%) scale(1.3);
+        .shot:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.3); }
+        
+        .slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        .slider-container span { min-width: 60px; text-align: center; font-weight: bold; }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
         }
-        .slider-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
+        .modal {
+            background: #222; width: 100%; max-width: 400px; padding: 20px;
+            border-radius: 12px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto;
         }
-        .slider-container span {
-            min-width: 60px;
-            text-align: center;
-            font-weight: bold;
-        }
+        .modal h3 { margin: 0 0 10px 0; border-bottom: 1px solid #444; padding-bottom: 5px; font-size: 18px; }
+        .list-container { list-style: none; padding: 0; margin: 0; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; background: #333; padding: 10px 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px;}
+        .list-item-info { display: flex; flex-direction: column; gap: 3px; }
+        .list-item-date { font-size: 11px; color: #aaa; }
+        .list-item-btns { display: flex; gap: 5px; }
+        .list-item-btns button { padding: 6px 10px; min-width: auto; font-size: 12px; }
+        .add-athlete-row { display: flex; gap: 10px; }
+        
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <span id="display-name">Nessun Atleta</span>
-        <span id="display-series">0T</span>
+        <div>
+            <span id="display-name">Nessun Atleta</span>
+            <span id="display-series" style="color: var(--accent); margin-left: 8px;">0T</span>
+        </div>
+        <div class="header-btns" id="header-btns">
+            <button class="secondary" onclick="openHistory()">Storico</button>
+            <button class="secondary" onclick="openSettings()">⚙️</button>
+        </div>
     </div>
 
-    <div class="controls">
+    <!-- Controlli Standard -->
+    <div class="controls" id="normal-controls-1">
         <select id="athlete-select"></select>
         <button id="btn-position" class="secondary" onclick="togglePosition()">Posizione: T</button>
     </div>
 
+    <!-- Target -->
     <div class="target-container">
         <div class="target-box" id="target-box">
-            <div class="target-center"></div>
+            <div class="target-center">
+                <div class="target-cross-h"></div>
+                <div class="target-cross-v"></div>
+                <div class="target-prone"></div>
+                <div class="target-dot"></div>
+            </div>
         </div>
     </div>
 
+    <!-- Slider -->
     <div class="slider-container">
         <input type="range" id="time-slider" min="0" max="0" value="0" step="1">
         <span id="slider-val">0 / 0</span>
     </div>
 
-    <div class="controls">
+    <!-- Controlli Azione Standard -->
+    <div class="controls" id="normal-controls-2">
         <button onclick="saveSeries()">Salva Serie</button>
         <button class="secondary" onclick="exportImage()">Esp. Immagine</button>
-        <button class="danger" onclick="clearTargetAndState()">Reset Serie</button>
+        <button class="danger" onclick="clearTargetAndState()">Reset</button>
+    </div>
+
+    <!-- Controlli Review Mode -->
+    <div class="controls hidden" id="review-controls">
+        <button class="secondary" onclick="exportImage()">Esp. Immagine Storico</button>
+        <button style="background-color: #fff; color: #000;" onclick="exitReviewMode()">⬅ Torna all'Allenamento</button>
+    </div>
+
+    <!-- Modale Impostazioni -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+            <h3>Gestione Atleti</h3>
+            <ul class="list-container" id="modal-athlete-list"></ul>
+            <div class="add-athlete-row">
+                <input type="text" id="new-athlete-name" placeholder="Nome atleta...">
+                <button onclick="addAthlete()">Aggiungi</button>
+            </div>
+            <h3 style="margin-top: 20px;">Dati App</h3>
+            <button class="danger" onclick="factoryReset()">⚠️ Cancella Tutti i Dati</button>
+            <button class="secondary" onclick="closeSettings()" style="margin-top: 10px;">Chiudi</button>
+        </div>
+    </div>
+
+    <!-- Modale Storico -->
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal">
+            <h3>Storico <span id="history-athlete-name" style="color: var(--accent);"></span></h3>
+            <ul class="list-container" id="modal-history-list"></ul>
+            <button class="secondary" onclick="closeHistory()" style="margin-top: 10px;">Chiudi</button>
+        </div>
     </div>
 
     <script>
         const MAX_SHOTS = 8;
-        const STORAGE_KEY = 'biathlon_tracker_data';
+        const STORAGE_KEY = 'biathlon_tracker_data_v2';
 
         let state = {
-            athletes: [
-                { id: 1, name: "Atleta Alpha", seriesT: 1, seriesP: 1 },
-                { id: 2, name: "Atleta Beta", seriesT: 1, seriesP: 1 }
-            ],
+            athletes: [ { id: 1, name: "Atleta 1", seriesT: 1, seriesP: 1 } ],
             currentAthleteId: 1,
             currentPos: 'T',
             currentShots: [],
-            history: []
+            history: [],
+            reviewMode: null // Se contiene un oggetto history, siamo in visore
         };
 
         const targetEl = document.getElementById('target-box');
@@ -175,50 +187,89 @@
 
         function init() {
             loadState();
-            
-            // Popola atleti
-            athleteSelect.innerHTML = '';
-            state.athletes.forEach(a => {
-                const opt = document.createElement('option');
-                opt.value = a.id;
-                opt.textContent = a.name;
-                if(a.id === state.currentAthleteId) opt.selected = true;
-                athleteSelect.appendChild(opt);
-            });
-            
-            athleteSelect.addEventListener('change', (e) => {
-                state.currentAthleteId = parseInt(e.target.value);
-                saveState();
-                updateHeader();
-            });
-
-            // Gestione slider
+            refreshInterface();
             slider.addEventListener('input', updateVisualsFromSlider);
-
-            updateHeader();
-            renderShotsFromState();
         }
 
-        // --- GESTIONE STATO E PERSISTENZA ---
+        function getActiveShots() {
+            return state.reviewMode ? state.reviewMode.shots : state.currentShots;
+        }
+
+        // --- GESTIONE STATO ---
         function saveState() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            updateSliderMax();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                athletes: state.athletes,
+                currentAthleteId: state.currentAthleteId,
+                currentPos: state.currentPos,
+                currentShots: state.currentShots,
+                history: state.history
+            }));
+            if(!state.reviewMode) updateSliderMax();
         }
 
         function loadState() {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
                 try {
-                    state = JSON.parse(saved);
-                } catch (e) {
-                    console.error("Errore caricamento dati corrotti.");
-                }
+                    const parsed = JSON.parse(saved);
+                    state.athletes = parsed.athletes || [];
+                    state.currentAthleteId = parsed.currentAthleteId;
+                    state.currentPos = parsed.currentPos || 'T';
+                    state.currentShots = parsed.currentShots || [];
+                    state.history = parsed.history || [];
+                    
+                    if(!state.athletes.length) forceDefaultAthlete();
+                    
+                    // Patch automatica per vecchi dati senza ID o athleteId
+                    state.history.forEach(h => {
+                        if(!h.id) h.id = Date.now() + Math.random();
+                        if(!h.athleteId) {
+                            const a = state.athletes.find(ath => ath.name === h.athlete);
+                            h.athleteId = a ? a.id : state.athletes[0].id;
+                        }
+                    });
+                } catch (e) { forceDefaultAthlete(); }
+            } else {
+                forceDefaultAthlete();
+            }
+            if(!state.athletes.find(a => a.id === state.currentAthleteId)) {
+                state.currentAthleteId = state.athletes[0].id;
             }
         }
 
+        function forceDefaultAthlete() {
+            state.athletes = [{ id: Date.now(), name: "Atleta 1", seriesT: 1, seriesP: 1 }];
+            state.currentAthleteId = state.athletes[0].id;
+        }
+
         // --- INTERFACCIA ---
+        function refreshInterface() {
+            athleteSelect.innerHTML = '';
+            state.athletes.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id; opt.textContent = a.name;
+                if(a.id === state.currentAthleteId) opt.selected = true;
+                athleteSelect.appendChild(opt);
+            });
+            
+            athleteSelect.onchange = (e) => {
+                state.currentAthleteId = parseInt(e.target.value);
+                saveState(); updateHeader();
+            };
+
+            updateHeader();
+            renderShotsFromState();
+            toggleReviewUI();
+        }
+
         function updateHeader() {
+            if(state.reviewMode) {
+                document.getElementById('display-name').textContent = state.reviewMode.athlete;
+                document.getElementById('display-series').textContent = `Revisione ${state.reviewMode.series}`;
+                return;
+            }
             const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
+            if(!athlete) return;
             document.getElementById('display-name').textContent = athlete.name;
             const seriesNum = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
             document.getElementById('display-series').textContent = `${seriesNum}${state.currentPos}`;
@@ -227,193 +278,273 @@
 
         function togglePosition() {
             state.currentPos = state.currentPos === 'T' ? 'P' : 'T';
-            saveState();
-            updateHeader();
+            saveState(); updateHeader();
         }
 
-        // --- GESTIONE BERSAGLIO E COLPI ---
+        function toggleReviewUI() {
+            const isReview = state.reviewMode !== null;
+            document.body.classList.toggle('review-mode', isReview);
+            
+            document.getElementById('normal-controls-1').classList.toggle('hidden', isReview);
+            document.getElementById('normal-controls-2').classList.toggle('hidden', isReview);
+            document.getElementById('header-btns').classList.toggle('hidden', isReview);
+            
+            document.getElementById('review-controls').classList.toggle('hidden', !isReview);
+        }
+
+        // --- STORICO ---
+        function openHistory() {
+            const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
+            document.getElementById('history-athlete-name').textContent = athlete.name;
+            
+            const list = document.getElementById('modal-history-list');
+            list.innerHTML = '';
+            
+            const athleteHistory = state.history.filter(h => h.athleteId === athlete.id).reverse();
+            
+            if(athleteHistory.length === 0) {
+                list.innerHTML = '<li style="text-align:center; padding: 20px 0; color:#aaa;">Nessuna serie salvata.</li>';
+            } else {
+                athleteHistory.forEach(h => {
+                    const li = document.createElement('li'); li.className = 'list-item';
+                    const date = new Date(h.timestamp);
+                    const dateStr = `${date.getDate()}/${date.getMonth()+1} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+                    
+                    li.innerHTML = `
+                        <div class="list-item-info">
+                            <strong>Serie ${h.series}</strong>
+                            <span class="list-item-date">${dateStr} - ${h.shots.length} colpi</span>
+                        </div>
+                        <div class="list-item-btns">
+                            <button onclick="viewHistoryItem(${h.id})">Apri</button>
+                            <button class="danger" onclick="deleteHistoryItem(${h.id})">X</button>
+                        </div>
+                    `;
+                    list.appendChild(li);
+                });
+            }
+            document.getElementById('history-modal').style.display = 'flex';
+        }
+
+        function closeHistory() { document.getElementById('history-modal').style.display = 'none'; }
+
+        function deleteHistoryItem(id) {
+            if(!confirm("Eliminare questa serie dallo storico?")) return;
+            state.history = state.history.filter(h => h.id !== id);
+            saveState();
+            openHistory(); // Aggiorna la lista
+        }
+
+        function viewHistoryItem(id) {
+            const item = state.history.find(h => h.id === id);
+            if(!item) return;
+            state.reviewMode = item;
+            closeHistory();
+            refreshInterface();
+        }
+
+        function exitReviewMode() {
+            state.reviewMode = null;
+            refreshInterface();
+        }
+
+        // --- IMPOSTAZIONI ---
+        function openSettings() {
+            document.getElementById('settings-modal').style.display = 'flex';
+            const list = document.getElementById('modal-athlete-list');
+            list.innerHTML = '';
+            state.athletes.forEach(a => {
+                const li = document.createElement('li'); li.className = 'list-item';
+                li.innerHTML = `<span>${a.name}</span> <button class="danger" onclick="removeAthlete(${a.id})">X</button>`;
+                list.appendChild(li);
+            });
+        }
+        function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+        
+        function addAthlete() {
+            const input = document.getElementById('new-athlete-name');
+            const name = input.value.trim();
+            if(!name) return;
+            state.athletes.push({ id: Date.now(), name: name, seriesT: 1, seriesP: 1 });
+            input.value = ''; saveState(); openSettings(); refreshInterface();
+        }
+
+        function removeAthlete(id) {
+            if(state.athletes.length <= 1) return alert("Devi avere almeno un atleta.");
+            if(!confirm("Eliminare questo atleta e tutto il suo storico?")) return;
+            state.athletes = state.athletes.filter(a => a.id !== id);
+            state.history = state.history.filter(h => h.athleteId !== id);
+            if(state.currentAthleteId === id) state.currentAthleteId = state.athletes[0].id;
+            saveState(); openSettings(); refreshInterface();
+        }
+
+        function factoryReset() {
+            if(!confirm("ATTENZIONE: Questo cancellerà tutti gli atleti e lo storico. Procedere?")) return;
+            localStorage.removeItem(STORAGE_KEY);
+            state.currentShots = []; state.history = []; state.reviewMode = null;
+            loadState(); refreshInterface(); closeSettings();
+        }
+
+        // --- GESTIONE BERSAGLIO ---
         targetEl.addEventListener('pointerdown', (e) => {
+            if(state.reviewMode) return; // Blocca inserimento se in storico
+
             if (e.target.classList.contains('shot')) {
                 draggedShot = e.target;
                 targetEl.setPointerCapture(e.pointerId);
-            } else if (e.target.id === 'target-box' || e.target.classList.contains('target-center')) {
-                // Se stavo guardando lo storico con lo slider, riporta lo slider al massimo prima di sparare
+            } else if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
                 if (parseInt(slider.value) < state.currentShots.length) {
-                    slider.value = state.currentShots.length;
-                    updateVisualsFromSlider();
+                    slider.value = state.currentShots.length; updateVisualsFromSlider();
                 }
-
-                if (state.currentShots.length >= MAX_SHOTS) {
-                    return; // Limite raggiunto
-                }
+                if (state.currentShots.length >= MAX_SHOTS) return;
 
                 const rect = targetEl.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                createShot(x, y);
+                createShot(e.clientX - rect.left, e.clientY - rect.top);
             }
         });
 
         targetEl.addEventListener('pointermove', (e) => {
-            if (draggedShot) {
+            if (draggedShot && !state.reviewMode) {
                 const rect = targetEl.getBoundingClientRect();
-                let x = e.clientX - rect.left;
-                let y = e.clientY - rect.top;
-                
-                x = Math.max(0, Math.min(x, rect.width));
-                y = Math.max(0, Math.min(y, rect.height));
+                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
 
-                draggedShot.style.left = `${x}px`;
-                draggedShot.style.top = `${y}px`;
-                
+                draggedShot.style.left = `${x}px`; draggedShot.style.top = `${y}px`;
                 const seq = parseInt(draggedShot.dataset.seq);
-                state.currentShots[seq - 1].x = x;
-                state.currentShots[seq - 1].y = y;
+                state.currentShots[seq - 1].x = x; state.currentShots[seq - 1].y = y;
             }
         });
 
         targetEl.addEventListener('pointerup', (e) => {
-            if (draggedShot) {
-                targetEl.releasePointerCapture(e.pointerId);
-                draggedShot = null;
-                saveState(); // Salva la nuova posizione
-            }
+            if (draggedShot) { targetEl.releasePointerCapture(e.pointerId); draggedShot = null; saveState(); }
         });
 
         function createShot(x, y) {
             const seq = state.currentShots.length + 1;
-            state.currentShots.push({ seq, x, y });
-            saveState();
-            
-            appendShotDOM(seq, x, y);
-            slider.value = state.currentShots.length;
-            updateVisualsFromSlider();
+            state.currentShots.push({ seq, x, y, bx: targetEl.offsetWidth, by: targetEl.offsetHeight });
+            saveState(); appendShotDOM(seq, x, y);
+            slider.value = state.currentShots.length; updateVisualsFromSlider();
         }
 
         function appendShotDOM(seq, x, y) {
             const shotEl = document.createElement('div');
-            shotEl.className = 'shot';
-            shotEl.dataset.seq = seq;
-            shotEl.style.left = `${x}px`;
-            shotEl.style.top = `${y}px`;
+            shotEl.className = 'shot'; shotEl.dataset.seq = seq;
+            shotEl.style.left = `${x}px`; shotEl.style.top = `${y}px`;
             shotEl.textContent = seq;
             targetEl.appendChild(shotEl);
         }
 
         function renderShotsFromState() {
-            // Pulisce solo i colpi, non il centro del bersaglio
-            const shots = targetEl.querySelectorAll('.shot');
-            shots.forEach(s => s.remove());
-
-            state.currentShots.forEach(s => {
-                appendShotDOM(s.seq, s.x, s.y);
-            });
+            targetEl.querySelectorAll('.shot').forEach(s => s.remove());
+            const shots = getActiveShots();
             
-            slider.value = state.currentShots.length;
-            updateSliderMax();
-            updateVisualsFromSlider();
+            shots.forEach(s => {
+                const currentW = targetEl.offsetWidth;
+                const currentH = targetEl.offsetHeight;
+                const scaleX = s.bx ? (currentW / s.bx) : 1;
+                const scaleY = s.by ? (currentH / s.by) : 1;
+                
+                // Aggiorna le coordinate in RAM ma NON salva lo stato se è in review (evita di corrompere lo storico)
+                let renderX = s.x * scaleX; 
+                let renderY = s.y * scaleY;
+                
+                if(!state.reviewMode) {
+                    s.x = renderX; s.y = renderY; s.bx = currentW; s.by = currentH;
+                }
+                appendShotDOM(s.seq, renderX, renderY);
+            });
+            slider.value = shots.length;
+            updateSliderMax(); updateVisualsFromSlider();
         }
 
         function updateSliderMax() {
-            const len = state.currentShots.length;
-            slider.max = len;
-            sliderVal.textContent = `${slider.value} / ${len}`;
+            const shots = getActiveShots();
+            slider.max = shots.length;
+            sliderVal.textContent = `${slider.value} / ${shots.length}`;
         }
 
         function updateVisualsFromSlider() {
             const visibleCount = parseInt(slider.value);
-            const len = state.currentShots.length;
-            sliderVal.textContent = `${visibleCount} / ${len}`;
-
-            const shots = targetEl.querySelectorAll('.shot');
-            shots.forEach(shotEl => {
-                const seq = parseInt(shotEl.dataset.seq);
-                shotEl.style.display = seq <= visibleCount ? 'flex' : 'none';
+            const shots = getActiveShots();
+            sliderVal.textContent = `${visibleCount} / ${shots.length}`;
+            targetEl.querySelectorAll('.shot').forEach(shotEl => {
+                shotEl.style.display = parseInt(shotEl.dataset.seq) <= visibleCount ? 'flex' : 'none';
             });
         }
 
-        // --- AZIONI ---
         function clearTargetAndState() {
-            state.currentShots = [];
-            saveState();
-            renderShotsFromState();
+            state.currentShots = []; saveState(); renderShotsFromState();
         }
 
         function saveSeries() {
-            if (state.currentShots.length === 0) return alert("Nessun colpo da salvare.");
-            
+            if (state.currentShots.length === 0) return alert("Nessun colpo.");
             const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
-            const seriesNum = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
-
+            
             state.history.push({
-                athlete: athlete.name,
+                id: Date.now(),
+                athleteId: athlete.id,
+                athlete: athlete.name, 
                 position: state.currentPos,
-                series: `${seriesNum}${state.currentPos}`,
-                shots: [...state.currentShots],
+                series: `${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}`,
+                shots: JSON.parse(JSON.stringify(state.currentShots)), // Deep copy per scindere la memoria
                 timestamp: new Date().toISOString()
             });
 
-            if (state.currentPos === 'T') athlete.seriesT++;
-            else athlete.seriesP++;
-
-            clearTargetAndState();
-            updateHeader();
+            if (state.currentPos === 'T') athlete.seriesT++; else athlete.seriesP++;
+            clearTargetAndState(); updateHeader();
         }
 
         function exportImage() {
-            // Crea un canvas temporaneo
             const canvas = document.createElement('canvas');
-            const size = 320;
-            canvas.width = size;
-            canvas.height = size;
+            const w = targetEl.offsetWidth; const h = targetEl.offsetHeight;
+            canvas.width = w; canvas.height = h;
             const ctx = canvas.getContext('2d');
 
-            // Sfondo bianco (carta)
+            ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, w, h);
+            const cx = w / 2; const cy = h / 2;
+            const targetRadius = (w * 0.90) / 2; 
+            
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath(); ctx.arc(cx, cy, targetRadius, 0, Math.PI * 2); ctx.fill();
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(cx - targetRadius, cy); ctx.lineTo(cx + targetRadius, cy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy - targetRadius); ctx.lineTo(cx, cy + targetRadius); ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(cx, cy, targetRadius * 0.391, 0, Math.PI * 2); ctx.stroke();
+
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, size, size);
+            ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
 
-            // Bersaglio nero centrale
-            ctx.fillStyle = '#000000';
-            ctx.beginPath();
-            ctx.arc(size/2, size/2, 75, 0, Math.PI * 2); // raggio 75 = diametro 150
-            ctx.fill();
-
-            // Disegna i colpi visibili in base allo slider
             const visibleCount = parseInt(slider.value);
+            const shots = getActiveShots();
             
             for(let i=0; i < visibleCount; i++) {
-                const s = state.currentShots[i];
-                
-                // Cerchio rosso
+                const s = shots[i];
                 ctx.fillStyle = '#ff3b30';
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, 12, 0, Math.PI * 2); // raggio 12
-                ctx.fill();
-                
-                // Bordo bianco
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // Testo interno
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
+                ctx.beginPath(); ctx.arc(s.x, s.y, 11, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(s.seq.toString(), s.x, s.y);
             }
 
-            // Scarica
             const link = document.createElement('a');
-            const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
-            const sName = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
             
-            link.download = `${athlete.name}_${sName}${state.currentPos}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+            if(state.reviewMode) {
+                link.download = `${state.reviewMode.athlete}_storico_${state.reviewMode.series}.png`;
+            } else {
+                const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
+                const sName = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
+                link.download = `${athlete.name}_${sName}${state.currentPos}.png`;
+            }
+            
+            link.href = canvas.toDataURL('image/png'); link.click();
         }
 
-        // Avvia
+        window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
+
         init();
     </script>
 </body>
