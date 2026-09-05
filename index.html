@@ -9,7 +9,6 @@
     
     <title>Biathlon Tracker</title>
     
-    <!-- Libreria per la creazione di file ZIP in locale -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
@@ -84,8 +83,11 @@
             border: 2px solid white; cursor: grab; z-index: 10;
             display: flex; justify-content: center; align-items: center;
             color: white; font-size: 11px; font-weight: bold; user-select: none;
+            transition: transform 0.1s ease;
         }
-        .shot:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.3); }
+        
+        /* Modifica visiva solo quando il colpo viene "agganciato" dopo 0.8s */
+        .shot.dragging { cursor: grabbing; transform: translate(-50%, -50%) scale(1.3); }
         
         .slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
         .slider-container span { min-width: 60px; text-align: center; font-weight: bold; }
@@ -122,13 +124,11 @@
         </div>
     </div>
 
-    <!-- Controlli Standard -->
     <div class="controls" id="normal-controls-1">
         <select id="athlete-select"></select>
         <button id="btn-position" class="secondary" onclick="togglePosition()">Posizione: T</button>
     </div>
 
-    <!-- Target -->
     <div class="target-container">
         <div class="target-box" id="target-box">
             <div class="target-center">
@@ -140,26 +140,26 @@
         </div>
     </div>
 
-    <!-- Slider -->
     <div class="slider-container">
         <input type="range" id="time-slider" min="0" max="0" value="0" step="1">
         <span id="slider-val">0 / 0</span>
     </div>
 
-    <!-- Controlli Azione Standard -->
     <div class="controls" id="normal-controls-2">
-        <button onclick="saveSeries()">Salva Serie</button>
-        <button class="secondary" onclick="exportImage()">Esp. Immagine</button>
-        <button class="danger" onclick="clearTargetAndState()">Reset Sagoma</button>
+        <button onclick="saveSeries()" style="flex: 2;">Salva</button>
+        <button class="secondary" onclick="undoLastShot()">↩️ Annulla</button>
+        <button class="danger" onclick="clearTargetAndState()">Reset</button>
+    </div>
+    
+    <div class="controls" id="normal-controls-3">
+        <button class="secondary" onclick="exportImage()">Esporta Immagine</button>
     </div>
 
-    <!-- Controlli Review Mode -->
     <div class="controls hidden" id="review-controls">
         <button class="secondary" onclick="exportImage()">Condividi Immagine</button>
         <button style="background-color: #fff; color: #000;" onclick="exitReviewMode()">⬅ Torna all'Allenamento</button>
     </div>
 
-    <!-- Modale Impostazioni -->
     <div class="modal-overlay" id="settings-modal">
         <div class="modal">
             <h3>Gestione Atleti</h3>
@@ -177,7 +177,6 @@
         </div>
     </div>
 
-    <!-- Modale Storico -->
     <div class="modal-overlay" id="history-modal">
         <div class="modal">
             <h3>Storico <span id="history-athlete-name" style="color: var(--accent);"></span></h3>
@@ -203,7 +202,11 @@
         const athleteSelect = document.getElementById('athlete-select');
         const slider = document.getElementById('time-slider');
         const sliderVal = document.getElementById('slider-val');
+        
+        // Variabili per gestione Long Press e Drag
         let draggedShot = null;
+        let isDragging = false;
+        let longPressTimer = null;
 
         function init() {
             loadState();
@@ -229,7 +232,6 @@
                     state.athletes = parsed.athletes || []; state.currentAthleteId = parsed.currentAthleteId;
                     state.currentPos = parsed.currentPos || 'T'; state.currentShots = parsed.currentShots || [];
                     state.history = parsed.history || [];
-                    
                     if(!state.athletes.length) forceDefaultAthlete();
                     
                     state.history.forEach(h => {
@@ -283,6 +285,7 @@
             document.body.classList.toggle('review-mode', isReview);
             document.getElementById('normal-controls-1').classList.toggle('hidden', isReview);
             document.getElementById('normal-controls-2').classList.toggle('hidden', isReview);
+            document.getElementById('normal-controls-3').classList.toggle('hidden', isReview);
             document.getElementById('header-btns').classList.toggle('hidden', isReview);
             document.getElementById('review-controls').classList.toggle('hidden', !isReview);
         }
@@ -353,24 +356,82 @@
             loadState(); refreshInterface(); closeSettings();
         }
 
+        // GESTIONE DEL TOUCH AGGIORNATA
         targetEl.addEventListener('pointerdown', (e) => {
             if(state.reviewMode) return; 
-            if (e.target.classList.contains('shot')) { draggedShot = e.target; targetEl.setPointerCapture(e.pointerId); } 
-            else if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
-                if (parseInt(slider.value) < state.currentShots.length) { slider.value = state.currentShots.length; updateVisualsFromSlider(); }
+            
+            // Riposiziona lo slider se necessario
+            if (parseInt(slider.value) < state.currentShots.length) { 
+                slider.value = state.currentShots.length; updateVisualsFromSlider(); 
+            }
+
+            if (e.target.classList.contains('shot')) {
+                const shotNode = e.target;
+                
+                // Avvia il timer di 0.8s
+                longPressTimer = setTimeout(() => {
+                    isDragging = true;
+                    draggedShot = shotNode;
+                    shotNode.classList.add('dragging');
+                    targetEl.setPointerCapture(e.pointerId);
+                    
+                    // Feedback tattile leggero se supportato
+                    if (navigator.vibrate) navigator.vibrate(50);
+                }, 800);
+
+            } else if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
                 if (state.currentShots.length >= MAX_SHOTS) return;
-                const rect = targetEl.getBoundingClientRect(); createShot(e.clientX - rect.left, e.clientY - rect.top);
+                const rect = targetEl.getBoundingClientRect(); 
+                createShot(e.clientX - rect.left, e.clientY - rect.top);
             }
         });
+
         targetEl.addEventListener('pointermove', (e) => {
-            if (draggedShot && !state.reviewMode) {
+            if (isDragging && draggedShot && !state.reviewMode) {
                 const rect = targetEl.getBoundingClientRect();
-                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width)); let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width)); 
+                let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+                
                 draggedShot.style.left = `${x}px`; draggedShot.style.top = `${y}px`;
-                state.currentShots[parseInt(draggedShot.dataset.seq) - 1].x = x; state.currentShots[parseInt(draggedShot.dataset.seq) - 1].y = y;
+                const seq = parseInt(draggedShot.dataset.seq);
+                state.currentShots[seq - 1].x = x; 
+                state.currentShots[seq - 1].y = y;
             }
         });
-        targetEl.addEventListener('pointerup', (e) => { if (draggedShot) { targetEl.releasePointerCapture(e.pointerId); draggedShot = null; saveState(); } });
+
+        const handlePointerUp = (e) => {
+            // Se c'era un timer in corso (tap durato meno di 0.8s)
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+
+                // Se ho mollato il dito ancora sopra un colpo esistente ed è stato veloce, piazzo un colpo nuovo sovrapposto.
+                if (e.target.classList.contains('shot')) {
+                    if (state.currentShots.length >= MAX_SHOTS) return;
+                    const rect = targetEl.getBoundingClientRect();
+                    createShot(e.clientX - rect.left, e.clientY - rect.top);
+                }
+            }
+
+            // Se stavo trascinando, concludo il drag
+            if (isDragging && draggedShot) {
+                draggedShot.classList.remove('dragging');
+                targetEl.releasePointerCapture(e.pointerId);
+                draggedShot = null;
+                isDragging = false;
+                saveState();
+            }
+        };
+
+        targetEl.addEventListener('pointerup', handlePointerUp);
+        targetEl.addEventListener('pointercancel', handlePointerUp); // per sicurezza su iOS
+
+        function undoLastShot() {
+            if (state.reviewMode || state.currentShots.length === 0) return;
+            state.currentShots.pop();
+            saveState();
+            renderShotsFromState();
+        }
 
         function createShot(x, y) {
             const seq = state.currentShots.length + 1;
@@ -459,18 +520,14 @@
 
             try {
                 const zip = new JSZip();
-                // Formatta la data (YYYY-MM-DD)
                 const dateStr = new Date().toISOString().split('T')[0];
                 const rootName = `Sessione_${dateStr}`;
                 const rootFolder = zip.folder(rootName);
 
-                // Dimensioni fisse ideali per le immagini salvate in background per evitare distorsioni
                 const exportW = 400; const exportH = 440; 
 
                 for (const h of state.history) {
                     const athleteFolder = rootFolder.folder(h.athlete);
-                    
-                    // Ricalcoliamo le posizioni dei colpi in base alla dimensione fissa ideale
                     const normalizedShots = h.shots.map(s => {
                         const scaleX = s.bx ? (exportW / s.bx) : 1;
                         const scaleY = s.by ? (exportH / s.by) : 1;
