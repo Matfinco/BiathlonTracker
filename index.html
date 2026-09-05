@@ -2,7 +2,12 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- Meta tag per farla comportare da vera app nativa su iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    
     <title>Biathlon Tracker</title>
     <style>
         :root {
@@ -12,12 +17,20 @@
             --target-box: #f5f5f5;
             --target-center: #1a1a1a;
             --shot-color: #ff3b30;
-            --review-bg: #8b4513; /* Colore per indicare la modalità storico */
+            --review-bg: #8b4513; 
         }
         body {
-            margin: 0; padding: 15px; background-color: var(--bg); color: var(--text);
+            margin: 0; 
+            /* Uso padding con le safe-area di Apple per evitare sovrapposizioni e sfocature con il notch/Dynamic Island */
+            padding: env(safe-area-inset-top, 15px) env(safe-area-inset-right, 15px) env(safe-area-inset-bottom, 15px) env(safe-area-inset-left, 15px); 
+            background-color: var(--bg); 
+            color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; touch-action: none;
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+            box-sizing: border-box; 
+            /* Il blocco dello scorrimento sul body è stato rimosso per permettere lo scroll in orizzontale */
             transition: background-color 0.3s;
         }
         body.review-mode { background-color: var(--review-bg); }
@@ -25,7 +38,7 @@
         /* --- HEADER & CONTROLS --- */
         .header {
             display: flex; justify-content: space-between; align-items: center;
-            font-size: 18px; font-weight: bold; margin-bottom: 15px;
+            font-size: 18px; font-weight: bold; margin-bottom: 15px; margin-top: 10px;
         }
         .header-btns { display: flex; gap: 5px; }
         .header-btns button { padding: 8px 12px; font-size: 14px; min-width: auto; }
@@ -39,13 +52,27 @@
         button.secondary { background-color: #555; }
         button.danger { background-color: #d32f2f; }
         
+        /* Classe specifica per i pulsanti di eliminazione quadrati */
+        .btn-delete {
+            width: 36px;
+            height: 36px;
+            padding: 0 !important;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 0 0 auto !important;
+            min-width: unset !important;
+        }
+        
         /* --- TARGET AREA --- */
         .target-container { display: flex; justify-content: center; align-items: center; margin: 10px 0; }
         
         .target-box {
             width: 100%; max-width: 420px; aspect-ratio: 1 / 1.1; 
             background-color: var(--target-box); position: relative;
-            border-radius: 8px; overflow: hidden; border: 1px solid #444; touch-action: none;
+            border-radius: 8px; overflow: hidden; border: 1px solid #444; 
+            /* Blocco il touch solo sul bersaglio, così puoi fare drag senza scorrere la pagina per sbaglio */
+            touch-action: none;
         }
         
         .target-center {
@@ -85,8 +112,8 @@
         .list-item { display: flex; justify-content: space-between; align-items: center; background: #333; padding: 10px 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px;}
         .list-item-info { display: flex; flex-direction: column; gap: 3px; }
         .list-item-date { font-size: 11px; color: #aaa; }
-        .list-item-btns { display: flex; gap: 5px; }
-        .list-item-btns button { padding: 6px 10px; min-width: auto; font-size: 12px; }
+        .list-item-btns { display: flex; gap: 5px; align-items: center; }
+        .list-item-btns button:not(.btn-delete) { padding: 6px 10px; min-width: auto; font-size: 12px; }
         .add-athlete-row { display: flex; gap: 10px; }
         
         .hidden { display: none !important; }
@@ -133,7 +160,7 @@
     <div class="controls" id="normal-controls-2">
         <button onclick="saveSeries()">Salva Serie</button>
         <button class="secondary" onclick="exportImage()">Esp. Immagine</button>
-        <button class="danger" onclick="clearTargetAndState()">Reset</button>
+        <button class="danger" onclick="clearTargetAndState()">Reset Sagoma</button>
     </div>
 
     <!-- Controlli Review Mode -->
@@ -176,7 +203,7 @@
             currentPos: 'T',
             currentShots: [],
             history: [],
-            reviewMode: null // Se contiene un oggetto history, siamo in visore
+            reviewMode: null 
         };
 
         const targetEl = document.getElementById('target-box');
@@ -195,7 +222,6 @@
             return state.reviewMode ? state.reviewMode.shots : state.currentShots;
         }
 
-        // --- GESTIONE STATO ---
         function saveState() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 athletes: state.athletes,
@@ -220,7 +246,6 @@
                     
                     if(!state.athletes.length) forceDefaultAthlete();
                     
-                    // Patch automatica per vecchi dati senza ID o athleteId
                     state.history.forEach(h => {
                         if(!h.id) h.id = Date.now() + Math.random();
                         if(!h.athleteId) {
@@ -242,7 +267,6 @@
             state.currentAthleteId = state.athletes[0].id;
         }
 
-        // --- INTERFACCIA ---
         function refreshInterface() {
             athleteSelect.innerHTML = '';
             state.athletes.forEach(a => {
@@ -292,7 +316,6 @@
             document.getElementById('review-controls').classList.toggle('hidden', !isReview);
         }
 
-        // --- STORICO ---
         function openHistory() {
             const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
             document.getElementById('history-athlete-name').textContent = athlete.name;
@@ -317,7 +340,7 @@
                         </div>
                         <div class="list-item-btns">
                             <button onclick="viewHistoryItem(${h.id})">Apri</button>
-                            <button class="danger" onclick="deleteHistoryItem(${h.id})">X</button>
+                            <button class="danger btn-delete" onclick="deleteHistoryItem(${h.id})">X</button>
                         </div>
                     `;
                     list.appendChild(li);
@@ -332,7 +355,7 @@
             if(!confirm("Eliminare questa serie dallo storico?")) return;
             state.history = state.history.filter(h => h.id !== id);
             saveState();
-            openHistory(); // Aggiorna la lista
+            openHistory(); 
         }
 
         function viewHistoryItem(id) {
@@ -348,14 +371,13 @@
             refreshInterface();
         }
 
-        // --- IMPOSTAZIONI ---
         function openSettings() {
             document.getElementById('settings-modal').style.display = 'flex';
             const list = document.getElementById('modal-athlete-list');
             list.innerHTML = '';
             state.athletes.forEach(a => {
                 const li = document.createElement('li'); li.className = 'list-item';
-                li.innerHTML = `<span>${a.name}</span> <button class="danger" onclick="removeAthlete(${a.id})">X</button>`;
+                li.innerHTML = `<span>${a.name}</span> <button class="danger btn-delete" onclick="removeAthlete(${a.id})">X</button>`;
                 list.appendChild(li);
             });
         }
@@ -385,9 +407,8 @@
             loadState(); refreshInterface(); closeSettings();
         }
 
-        // --- GESTIONE BERSAGLIO ---
         targetEl.addEventListener('pointerdown', (e) => {
-            if(state.reviewMode) return; // Blocca inserimento se in storico
+            if(state.reviewMode) return; 
 
             if (e.target.classList.contains('shot')) {
                 draggedShot = e.target;
@@ -444,7 +465,6 @@
                 const scaleX = s.bx ? (currentW / s.bx) : 1;
                 const scaleY = s.by ? (currentH / s.by) : 1;
                 
-                // Aggiorna le coordinate in RAM ma NON salva lo stato se è in review (evita di corrompere lo storico)
                 let renderX = s.x * scaleX; 
                 let renderY = s.y * scaleY;
                 
@@ -486,7 +506,7 @@
                 athlete: athlete.name, 
                 position: state.currentPos,
                 series: `${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}`,
-                shots: JSON.parse(JSON.stringify(state.currentShots)), // Deep copy per scindere la memoria
+                shots: JSON.parse(JSON.stringify(state.currentShots)), 
                 timestamp: new Date().toISOString()
             });
 
