@@ -23,24 +23,18 @@
         }
         body.review-mode { background-color: var(--review-bg); }
         
-        /* Blocco scroll quando modale aperta */
         body.modal-open { overflow: hidden; }
 
         .header { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; margin-top: 10px; }
         .header-btns { display: flex; gap: 5px; }
         .header-btns button { padding: 8px 12px; font-size: 14px; min-width: auto; position: relative; }
         
-        .badge {
-            display: none; position: absolute; top: -5px; right: -5px; background: #ff3b30;
-            color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold;
-        }
-
         .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         select, button, input[type="range"], input[type="text"], input[type="url"] {
             padding: 12px; font-size: 14px; border-radius: 8px; border: none;
             background-color: #333; color: white; flex: 1; min-width: 120px; box-sizing: border-box;
         }
-        button { background-color: var(--accent); font-weight: bold; cursor: pointer; }
+        button { background-color: var(--accent); font-weight: bold; cursor: pointer; transition: background-color 0.2s;}
         button:disabled { opacity: 0.6; cursor: not-allowed; }
         button.secondary { background-color: #555; }
         button.danger { background-color: #d32f2f; }
@@ -79,7 +73,6 @@
         .section-box { background: #333; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; border: 1px solid #444; }
         .section-box label { font-size: 12px; font-weight: bold; color: #aaa;}
         
-        /* Gestione fisarmonica per il cloud */
         .cloud-content { display: none; margin-top: 10px; }
         .cloud-content.active { display: flex; flex-direction: column; gap: 10px; }
         
@@ -100,7 +93,7 @@
         </div>
         <div class="header-btns" id="header-btns">
             <button class="secondary" onclick="openHistory()">Storico</button>
-            <button class="secondary" onclick="openSettings()">⚙️ <span class="badge" id="sync-badge">0</span></button>
+            <button class="secondary" onclick="openSettings()">⚙️ Impostazioni</button>
         </div>
     </div>
 
@@ -131,7 +124,9 @@
         <button class="danger" onclick="clearTargetAndState()">Reset</button>
     </div>
     
+    <!-- Tasti di Sistema Estratti -->
     <div class="controls" id="normal-controls-3">
+        <button id="btn-sync" class="secondary" onclick="syncWithCloud()" style="flex: 1;">☁️ Sincronizzato</button>
         <button class="warning" onclick="openNewSessionModal()" style="flex: 1;">🔄 Nuova Sessione</button>
     </div>
 
@@ -145,7 +140,6 @@
         <div class="modal">
             <h3>⚙️ Impostazioni App</h3>
             
-            <!-- Sottomenù Sincronizzazione Cloud -->
             <button class="secondary" onclick="toggleCloudConfig()" style="display: flex; justify-content: space-between; align-items: center;">
                 <span>☁️ Configura Cloud & Firma</span>
                 <span>▼</span>
@@ -157,7 +151,6 @@
                 
                 <label style="margin-top: 10px;">URL GOOGLE SHEETS</label>
                 <input type="url" id="sheet-url" placeholder="https://script.google.com/..." onchange="saveConfig()">
-                <button class="accent" id="btn-sync" onclick="syncWithCloud()">☁️ Sincronizza Dati</button>
             </div>
 
             <h3 style="margin-top: 10px;">Archivio Atleti</h3>
@@ -232,7 +225,6 @@
             document.getElementById('sheet-url').value = state.cloudUrl;
             slider.addEventListener('input', updateVisualsFromSlider);
             
-            // Blocco di sicurezza addizionale per iOS Safari (previene il trascinamento dell'overlay)
             document.querySelectorAll('.modal-overlay').forEach(overlay => {
                 overlay.addEventListener('touchmove', (e) => {
                     if(e.target === overlay) e.preventDefault();
@@ -240,15 +232,8 @@
             });
         }
 
-        // Funzioni centralizzate per apertura/chiusura modali con blocco scroll
-        function openModal(id) {
-            document.getElementById(id).style.display = 'flex';
-            document.body.classList.add('modal-open');
-        }
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-            document.body.classList.remove('modal-open');
-        }
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; document.body.classList.add('modal-open'); }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; document.body.classList.remove('modal-open'); }
 
         function getActiveShots() { return state.reviewMode ? state.reviewMode.shots : state.currentShots; }
 
@@ -326,27 +311,32 @@
             document.getElementById('review-controls').classList.toggle('hidden', !isReview);
         }
 
-        // --- CLOUD E IMPOSTAZIONI ---
-        function toggleCloudConfig() {
-            const panel = document.getElementById('cloud-config-panel');
-            panel.classList.toggle('active');
-        }
+        function toggleCloudConfig() { document.getElementById('cloud-config-panel').classList.toggle('active'); }
 
         function saveConfig() { state.coachName = document.getElementById('coach-name').value.trim(); state.cloudUrl = document.getElementById('sheet-url').value.trim(); saveState(); }
 
         function updateSyncBadge() {
-            const badge = document.getElementById('sync-badge'); const count = state.syncQueue.length;
-            if(count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; }
+            const count = state.syncQueue.length;
             const syncBtn = document.getElementById('btn-sync');
-            if(syncBtn) syncBtn.textContent = count > 0 ? `☁️ Sincronizza Dati (${count})` : `☁️ Sincronizzato`;
+            if(syncBtn) {
+                if(count > 0) {
+                    syncBtn.textContent = `☁️ Sincronizza (${count})`;
+                    syncBtn.className = ''; // Rimuove 'secondary', usa il blu di base
+                } else {
+                    syncBtn.textContent = `☁️ Sincronizzato`;
+                    syncBtn.className = 'secondary'; // Grigiastro
+                }
+            }
         }
 
         async function syncWithCloud() {
             if(state.syncQueue.length === 0) return alert("Tutti i dati sono già sincronizzati.");
-            if(!state.cloudUrl || !state.cloudUrl.startsWith('http')) return alert("Inserisci un URL valido di Google Apps Script.");
-            if(!state.coachName) return alert("Inserisci la tua Firma (Allenatore) per poter inviare i dati.");
+            if(!state.cloudUrl || !state.cloudUrl.startsWith('http')) return alert("Devi prima configurare l'URL nelle impostazioni.");
+            if(!state.coachName) return alert("Devi inserire la tua firma nelle impostazioni.");
             
-            const btn = document.getElementById('btn-sync'); btn.textContent = "⏳ Invio in corso..."; btn.disabled = true;
+            const btn = document.getElementById('btn-sync'); 
+            const originalText = btn.textContent;
+            btn.textContent = "⏳ Invio..."; btn.disabled = true;
 
             try {
                 const response = await fetch(state.cloudUrl, {
@@ -447,7 +437,6 @@
             localStorage.removeItem(STORAGE_KEY); location.reload();
         }
 
-        // --- GESTIONE STORICO ---
         function openHistory() {
             if(state.activeAthletes.length === 0) return alert("Nessun atleta attivo.");
             const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
