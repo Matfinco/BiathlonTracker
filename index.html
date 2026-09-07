@@ -3,49 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    
     <title>Biathlon Tracker</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         :root {
-            --bg: #1e1e1e;
-            --text: #ffffff;
-            --accent: #007aff;
-            --target-box: #f5f5f5;
-            --target-center: #1a1a1a;
-            --shot-color: #ff3b30;
-            --review-bg: #8b4513; 
+            --bg: #1e1e1e; --text: #ffffff; --accent: #007aff;
+            --target-box: #f5f5f5; --target-center: #1a1a1a;
+            --shot-color: #ff3b30; --review-bg: #8b4513; 
         }
         body {
-            margin: 0; 
-            padding: env(safe-area-inset-top, 15px) env(safe-area-inset-right, 15px) env(safe-area-inset-bottom, 15px) env(safe-area-inset-left, 15px); 
-            background-color: var(--bg); 
-            color: var(--text);
+            margin: 0; padding: env(safe-area-inset-top, 15px) env(safe-area-inset-right, 15px) env(safe-area-inset-bottom, 15px) env(safe-area-inset-left, 15px); 
+            background-color: var(--bg); color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            display: flex; 
-            flex-direction: column; 
-            min-height: 100vh; 
-            box-sizing: border-box; 
-            transition: background-color 0.3s;
+            display: flex; flex-direction: column; min-height: 100vh; box-sizing: border-box; transition: background-color 0.3s;
         }
         body.review-mode { background-color: var(--review-bg); }
         
-        .header {
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 18px; font-weight: bold; margin-bottom: 15px; margin-top: 10px;
-        }
+        .header { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; margin-top: 10px; }
         .header-btns { display: flex; gap: 5px; }
-        .header-btns button { padding: 8px 12px; font-size: 14px; min-width: auto; }
+        .header-btns button { padding: 8px 12px; font-size: 14px; min-width: auto; position: relative; }
         
+        .badge {
+            display: none; position: absolute; top: -5px; right: -5px; background: #ff3b30;
+            color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold;
+        }
+
         .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        select, button, input[type="range"], input[type="text"] {
+        select, button, input[type="range"], input[type="text"], input[type="url"] {
             padding: 12px; font-size: 14px; border-radius: 8px; border: none;
-            background-color: #333; color: white; flex: 1; min-width: 120px;
+            background-color: #333; color: white; flex: 1; min-width: 120px; box-sizing: border-box;
         }
         button { background-color: var(--accent); font-weight: bold; cursor: pointer; }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -54,52 +44,23 @@
         button.warning { background-color: #ff9800; color: white; }
         button.success { background-color: #34c759; color: white; }
         
-        .btn-delete {
-            width: 36px; height: 36px; padding: 0 !important; display: flex;
-            justify-content: center; align-items: center; flex: 0 0 auto !important; min-width: unset !important;
-        }
-        
+        .btn-delete { width: 36px; height: 36px; padding: 0 !important; display: flex; justify-content: center; align-items: center; flex: 0 0 auto !important; min-width: unset !important; }
         .target-container { display: flex; justify-content: center; align-items: center; margin: 10px 0; }
         
-        .target-box {
-            width: 100%; max-width: 420px; aspect-ratio: 1 / 1.1; 
-            background-color: var(--target-box); position: relative;
-            border-radius: 8px; overflow: hidden; border: 1px solid #444; touch-action: none;
-        }
-        
-        .target-center {
-            width: 90%; aspect-ratio: 1 / 1; background-color: var(--target-center);
-            border-radius: 50%; position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); pointer-events: none;
-        }
+        .target-box { width: 100%; max-width: 420px; aspect-ratio: 1 / 1.1; background-color: var(--target-box); position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #444; touch-action: none; }
+        .target-center { width: 90%; aspect-ratio: 1 / 1; background-color: var(--target-center); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
         .target-cross-h { width: 100%; height: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 50%; left: 0; }
         .target-cross-v { height: 100%; width: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 0; left: 50%; }
         .target-prone { width: 39.1%; aspect-ratio: 1 / 1; border: 1.5px solid rgba(255,255,255,0.6); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         .target-dot { width: 4px; height: 4px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-        .shot {
-            width: 22px; height: 22px; background-color: var(--shot-color);
-            border-radius: 50%; position: absolute; transform: translate(-50%, -50%);
-            border: 2px solid white; cursor: grab; z-index: 10;
-            display: flex; justify-content: center; align-items: center;
-            color: white; font-size: 11px; font-weight: bold; user-select: none;
-            transition: transform 0.1s ease;
-        }
-        
-        /* Modifica visiva solo quando il colpo viene "agganciato" dopo 0.8s */
+        .shot { width: 22px; height: 22px; background-color: var(--shot-color); border-radius: 50%; position: absolute; transform: translate(-50%, -50%); border: 2px solid white; cursor: grab; z-index: 10; display: flex; justify-content: center; align-items: center; color: white; font-size: 11px; font-weight: bold; user-select: none; transition: transform 0.1s ease; }
         .shot.dragging { cursor: grabbing; transform: translate(-50%, -50%) scale(1.3); }
-        
         .slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
         .slider-container span { min-width: 60px; text-align: center; font-weight: bold; }
 
-        .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
-        }
-        .modal {
-            background: #222; width: 100%; max-width: 400px; padding: 20px;
-            border-radius: 12px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto;
-        }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal { background: #222; width: 100%; max-width: 400px; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; }
         .modal h3 { margin: 0 0 10px 0; border-bottom: 1px solid #444; padding-bottom: 5px; font-size: 18px; }
         .list-container { list-style: none; padding: 0; margin: 0; }
         .list-item { display: flex; justify-content: space-between; align-items: center; background: #333; padding: 10px 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px;}
@@ -107,7 +68,17 @@
         .list-item-date { font-size: 11px; color: #aaa; }
         .list-item-btns { display: flex; gap: 5px; align-items: center; }
         .list-item-btns button:not(.btn-delete) { padding: 6px 10px; min-width: auto; font-size: 12px; }
-        .add-athlete-row { display: flex; gap: 10px; }
+        
+        .input-row { display: flex; gap: 10px; }
+        .section-box { background: #333; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; border: 1px solid #444; }
+        .section-box p { margin: 0; font-size: 12px; color: #ccc; }
+        .section-box label { font-size: 12px; font-weight: bold; color: #aaa;}
+        
+        .checklist { max-height: 250px; overflow-y: auto; background: #333; border-radius: 8px; padding: 10px; border: 1px solid #444;}
+        .checklist label { display: flex; align-items: center; gap: 10px; padding: 12px 5px; border-bottom: 1px solid #444; font-size: 16px; cursor: pointer;}
+        .checklist label:last-child { border-bottom: none; }
+        .checklist input[type="checkbox"] { flex: 0 0 auto; width: 20px; height: 20px; }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -120,7 +91,7 @@
         </div>
         <div class="header-btns" id="header-btns">
             <button class="secondary" onclick="openHistory()">Storico</button>
-            <button class="secondary" onclick="openSettings()">⚙️</button>
+            <button class="secondary" onclick="openSettings()">⚙️ <span class="badge" id="sync-badge">0</span></button>
         </div>
     </div>
 
@@ -152,7 +123,7 @@
     </div>
     
     <div class="controls" id="normal-controls-3">
-        <button class="secondary" onclick="exportImage()">Esporta Immagine</button>
+        <button class="warning" onclick="openNewSessionModal()" style="flex: 1;">🔄 Nuova Sessione</button>
     </div>
 
     <div class="controls hidden" id="review-controls">
@@ -160,23 +131,58 @@
         <button style="background-color: #fff; color: #000;" onclick="exitReviewMode()">⬅ Torna all'Allenamento</button>
     </div>
 
+    <!-- Modale Impostazioni -->
     <div class="modal-overlay" id="settings-modal">
         <div class="modal">
-            <h3>Gestione Atleti</h3>
-            <ul class="list-container" id="modal-athlete-list"></ul>
-            <div class="add-athlete-row">
-                <input type="text" id="new-athlete-name" placeholder="Nome atleta...">
+            <h3>⚙️ Impostazioni App</h3>
+            
+            <div class="section-box">
+                <label>LA TUA FIRMA (ALLENATORE)</label>
+                <input type="text" id="coach-name" placeholder="Es. Matteo Finco" onchange="saveConfig()">
+                
+                <label style="margin-top: 10px;">URL GOOGLE SHEETS (CLOUD)</label>
+                <input type="url" id="sheet-url" placeholder="https://script.google.com/..." onchange="saveConfig()">
+                <button class="accent" id="btn-sync" onclick="syncWithCloud()">☁️ Sincronizza Dati</button>
+            </div>
+
+            <h3 style="margin-top: 10px;">Roster Globale</h3>
+            <div class="input-row">
+                <input type="text" id="new-athlete-name" placeholder="Nuovo atleta...">
                 <button onclick="addAthlete()">Aggiungi</button>
             </div>
+            <ul class="list-container" id="modal-athlete-list" style="max-height: 150px; overflow-y: auto;"></ul>
             
-            <h3 style="margin-top: 20px;">Dati App</h3>
-            <button class="success" id="btn-export-zip" onclick="exportFullSession()">📥 Esporta Tutta la Sessione (ZIP)</button>
-            <button class="warning" onclick="newSession()">🔄 Nuova Sessione (Mantieni Atleti)</button>
-            <button class="danger" onclick="factoryReset()" style="margin-top: 10px;">⚠️ Cancella Tutti i Dati</button>
+            <div class="input-row">
+                <button class="secondary" onclick="exportRoster()">📤 Esporta Roster</button>
+                <button class="secondary" onclick="document.getElementById('import-roster-file').click()">📥 Importa</button>
+                <input type="file" id="import-roster-file" accept=".json" style="display: none;" onchange="importRoster(event)">
+            </div>
+
+            <h3 style="margin-top: 10px;">Dati e Backup</h3>
+            <button class="success" id="btn-export-zip" onclick="exportFullSession()">📥 Scarica Backup Sessione (ZIP)</button>
+            <button class="danger" onclick="factoryReset()" style="margin-top: 10px;">⚠️ Cancella Tutto (Reset Fabbrica)</button>
             <button class="secondary" onclick="closeSettings()" style="margin-top: 10px;">Chiudi</button>
         </div>
     </div>
 
+    <!-- Modale Nuova Sessione -->
+    <div class="modal-overlay" id="new-session-modal">
+        <div class="modal">
+            <h3>🔄 Inizia Nuova Sessione</h3>
+            <p style="font-size: 13px; color: #ccc; margin-top: 0;">Seleziona gli atleti presenti al poligono oggi. I contatori delle serie ripartiranno da 1.</p>
+            
+            <div class="checklist" id="session-checklist">
+                <!-- Generato via JS -->
+            </div>
+            
+            <div class="input-row">
+                <button class="secondary" onclick="closeNewSessionModal()">Annulla</button>
+                <button class="accent" onclick="startNewSession()">Avvia Sessione</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale Storico -->
     <div class="modal-overlay" id="history-modal">
         <div class="modal">
             <h3>Storico <span id="history-athlete-name" style="color: var(--accent);"></span></h3>
@@ -187,14 +193,18 @@
 
     <script>
         const MAX_SHOTS = 8;
-        const STORAGE_KEY = 'biathlon_tracker_data_v2';
+        const STORAGE_KEY = 'biathlon_tracker_data_v4';
 
         let state = {
-            athletes: [ { id: 1, name: "Atleta 1", seriesT: 1, seriesP: 1 } ],
+            coachName: "",
+            cloudUrl: "",
+            roster: [ { id: 1, name: "Atleta di Test" } ],
+            activeAthletes: [ { id: 1, name: "Atleta di Test", seriesT: 1, seriesP: 1 } ],
             currentAthleteId: 1,
             currentPos: 'T',
             currentShots: [],
             history: [],
+            syncQueue: [],
             reviewMode: null 
         };
 
@@ -203,7 +213,6 @@
         const slider = document.getElementById('time-slider');
         const sliderVal = document.getElementById('slider-val');
         
-        // Variabili per gestione Long Press e Drag
         let draggedShot = null;
         let isDragging = false;
         let longPressTimer = null;
@@ -211,16 +220,16 @@
         function init() {
             loadState();
             refreshInterface();
+            document.getElementById('coach-name').value = state.coachName;
+            document.getElementById('sheet-url').value = state.cloudUrl;
             slider.addEventListener('input', updateVisualsFromSlider);
         }
 
         function getActiveShots() { return state.reviewMode ? state.reviewMode.shots : state.currentShots; }
 
         function saveState() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                athletes: state.athletes, currentAthleteId: state.currentAthleteId,
-                currentPos: state.currentPos, currentShots: state.currentShots, history: state.history
-            }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            updateSyncBadge();
             if(!state.reviewMode) updateSliderMax();
         }
 
@@ -228,40 +237,65 @@
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
                 try {
-                    const parsed = JSON.parse(saved);
-                    state.athletes = parsed.athletes || []; state.currentAthleteId = parsed.currentAthleteId;
-                    state.currentPos = parsed.currentPos || 'T'; state.currentShots = parsed.currentShots || [];
-                    state.history = parsed.history || [];
-                    if(!state.athletes.length) forceDefaultAthlete();
+                    const p = JSON.parse(saved);
+                    state.coachName = p.coachName || "";
+                    state.cloudUrl = p.cloudUrl || "";
                     
-                    state.history.forEach(h => {
-                        if(!h.id) h.id = Date.now() + Math.random();
-                        if(!h.athleteId) {
-                            const a = state.athletes.find(ath => ath.name === h.athlete);
-                            h.athleteId = a ? a.id : state.athletes[0].id;
-                        }
-                    });
+                    // Migrazione dai vecchi formati (v2/v3) a v4
+                    if (p.roster) {
+                        state.roster = p.roster;
+                    } else if (p.athletes) {
+                        state.roster = p.athletes.map(a => ({id: a.id, name: a.name}));
+                    }
+                    
+                    if (p.activeAthletes) {
+                        state.activeAthletes = p.activeAthletes;
+                    } else if (p.athletes) {
+                        state.activeAthletes = p.athletes;
+                    }
+
+                    state.currentAthleteId = p.currentAthleteId;
+                    state.currentPos = p.currentPos || 'T';
+                    state.currentShots = p.currentShots || [];
+                    state.history = p.history || [];
+                    state.syncQueue = p.syncQueue || [];
+                    
+                    if(!state.roster.length) forceDefaultAthlete();
                 } catch (e) { forceDefaultAthlete(); }
             } else { forceDefaultAthlete(); }
-            if(!state.athletes.find(a => a.id === state.currentAthleteId)) state.currentAthleteId = state.athletes[0].id;
+            
+            // Fallback se l'atleta selezionato non è più tra i presenti
+            if(!state.activeAthletes.find(a => a.id === state.currentAthleteId)) {
+                if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
+            }
         }
 
         function forceDefaultAthlete() {
-            state.athletes = [{ id: Date.now(), name: "Atleta 1", seriesT: 1, seriesP: 1 }];
-            state.currentAthleteId = state.athletes[0].id;
+            const id = Date.now();
+            state.roster = [{ id: id, name: "Atleta di Test" }];
+            state.activeAthletes = [{ id: id, name: "Atleta di Test", seriesT: 1, seriesP: 1 }];
+            state.currentAthleteId = id;
         }
 
         function refreshInterface() {
             athleteSelect.innerHTML = '';
-            state.athletes.forEach(a => {
+            if(state.activeAthletes.length === 0) {
                 const opt = document.createElement('option');
-                opt.value = a.id; opt.textContent = a.name;
-                if(a.id === state.currentAthleteId) opt.selected = true;
+                opt.textContent = "-- Nessun atleta presente --";
                 athleteSelect.appendChild(opt);
-            });
+                athleteSelect.disabled = true;
+            } else {
+                athleteSelect.disabled = false;
+                state.activeAthletes.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id; opt.textContent = a.name;
+                    if(a.id === state.currentAthleteId) opt.selected = true;
+                    athleteSelect.appendChild(opt);
+                });
+            }
             
             athleteSelect.onchange = (e) => { state.currentAthleteId = parseInt(e.target.value); saveState(); updateHeader(); };
-            updateHeader(); renderShotsFromState(); toggleReviewUI();
+            updateHeader(); renderShotsFromState(); toggleReviewUI(); updateSyncBadge();
         }
 
         function updateHeader() {
@@ -270,8 +304,12 @@
                 document.getElementById('display-series').textContent = `Revisione ${state.reviewMode.series}`;
                 return;
             }
-            const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
-            if(!athlete) return;
+            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
+            if(!athlete) {
+                document.getElementById('display-name').textContent = "Nessuno";
+                document.getElementById('display-series').textContent = "-";
+                return;
+            }
             document.getElementById('display-name').textContent = athlete.name;
             const seriesNum = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
             document.getElementById('display-series').textContent = `${seriesNum}${state.currentPos}`;
@@ -290,148 +328,213 @@
             document.getElementById('review-controls').classList.toggle('hidden', !isReview);
         }
 
-        function openHistory() {
-            const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
-            document.getElementById('history-athlete-name').textContent = athlete.name;
-            
-            const list = document.getElementById('modal-history-list'); list.innerHTML = '';
-            const athleteHistory = state.history.filter(h => h.athleteId === athlete.id).reverse();
-            
-            if(athleteHistory.length === 0) {
-                list.innerHTML = '<li style="text-align:center; padding: 20px 0; color:#aaa;">Nessuna serie salvata.</li>';
-            } else {
-                athleteHistory.forEach(h => {
-                    const li = document.createElement('li'); li.className = 'list-item';
-                    const date = new Date(h.timestamp);
-                    const dateStr = `${date.getDate()}/${date.getMonth()+1} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
-                    
-                    li.innerHTML = `
-                        <div class="list-item-info"><strong>Serie ${h.series}</strong><span class="list-item-date">${dateStr} - ${h.shots.length} colpi</span></div>
-                        <div class="list-item-btns"><button onclick="viewHistoryItem(${h.id})">Apri</button><button class="danger btn-delete" onclick="deleteHistoryItem(${h.id})">X</button></div>
-                    `;
-                    list.appendChild(li);
-                });
-            }
-            document.getElementById('history-modal').style.display = 'flex';
+        function saveConfig() {
+            state.coachName = document.getElementById('coach-name').value.trim();
+            state.cloudUrl = document.getElementById('sheet-url').value.trim();
+            saveState();
         }
 
-        function closeHistory() { document.getElementById('history-modal').style.display = 'none'; }
-        function deleteHistoryItem(id) { if(!confirm("Eliminare?")) return; state.history = state.history.filter(h => h.id !== id); saveState(); openHistory(); }
-        function viewHistoryItem(id) { const item = state.history.find(h => h.id === id); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
-        function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
+        function updateSyncBadge() {
+            const badge = document.getElementById('sync-badge'); const count = state.syncQueue.length;
+            if(count > 0) { badge.textContent = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; }
+            const syncBtn = document.getElementById('btn-sync');
+            if(syncBtn) syncBtn.textContent = count > 0 ? `☁️ Sincronizza Dati (${count})` : `☁️ Sincronizzato`;
+        }
 
+        async function syncWithCloud() {
+            if(state.syncQueue.length === 0) return alert("Tutti i dati sono già sincronizzati.");
+            if(!state.cloudUrl || !state.cloudUrl.startsWith('http')) return alert("Inserisci un URL valido di Google Apps Script.");
+            if(!state.coachName) return alert("Inserisci il tuo Nome Allenatore per poter inviare i dati.");
+            
+            const btn = document.getElementById('btn-sync'); btn.textContent = "⏳ Invio in corso..."; btn.disabled = true;
+
+            try {
+                const response = await fetch(state.cloudUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(state.syncQueue)
+                });
+                const result = await response.json();
+                if(result.status === "success") {
+                    state.syncQueue = []; saveState(); alert("Sincronizzazione completata!");
+                } else { alert("Errore dallo script: " + result.error); }
+            } catch (err) { alert("Errore di rete. Dettaglio: " + err.message); } 
+            finally { btn.disabled = false; updateSyncBadge(); }
+        }
+
+        // --- GESTIONE NUOVA SESSIONE E ROSTER ---
+        function openNewSessionModal() {
+            const list = document.getElementById('session-checklist');
+            list.innerHTML = '';
+            
+            if(state.roster.length === 0) {
+                list.innerHTML = "<p style='color:#ccc; text-align:center;'>Nessun atleta nel Roster.</p>";
+            } else {
+                state.roster.forEach(athlete => {
+                    const isCurrentlyActive = state.activeAthletes.some(a => a.id === athlete.id);
+                    const label = document.createElement('label');
+                    label.innerHTML = `<input type="checkbox" value="${athlete.id}" ${isCurrentlyActive ? 'checked' : ''}> ${athlete.name}`;
+                    list.appendChild(label);
+                });
+            }
+            document.getElementById('new-session-modal').style.display = 'flex';
+        }
+
+        function closeNewSessionModal() { document.getElementById('new-session-modal').style.display = 'none'; }
+
+        function startNewSession() {
+            if(state.currentShots.length > 0 && !confirm("Hai dei colpi non salvati sul bersaglio. Vuoi procedere comunque?")) return;
+            
+            const checkboxes = document.querySelectorAll('#session-checklist input[type="checkbox"]:checked');
+            const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            
+            if(selectedIds.length === 0) {
+                if(!confirm("Non hai selezionato nessun atleta. Avviare sessione vuota?")) return;
+            }
+
+            // Svuota storico temporaneo e prepara i nuovi presenti
+            state.history = []; 
+            state.currentShots = []; 
+            state.reviewMode = null;
+            
+            state.activeAthletes = state.roster
+                .filter(a => selectedIds.includes(a.id))
+                .map(a => ({ id: a.id, name: a.name, seriesT: 1, seriesP: 1 }));
+            
+            if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
+            
+            saveState(); refreshInterface(); closeNewSessionModal();
+        }
+
+        // --- IMPOSTAZIONI E ROSTER GLOBALE ---
         function openSettings() {
             document.getElementById('settings-modal').style.display = 'flex';
+            renderRosterList();
+        }
+        function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+        
+        function renderRosterList() {
             const list = document.getElementById('modal-athlete-list'); list.innerHTML = '';
-            state.athletes.forEach(a => {
+            state.roster.forEach(a => {
                 const li = document.createElement('li'); li.className = 'list-item';
                 li.innerHTML = `<span>${a.name}</span> <button class="danger btn-delete" onclick="removeAthlete(${a.id})">X</button>`;
                 list.appendChild(li);
             });
         }
-        function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
-        
+
         function addAthlete() {
             const input = document.getElementById('new-athlete-name'); const name = input.value.trim();
-            if(!name) return; state.athletes.push({ id: Date.now(), name: name, seriesT: 1, seriesP: 1 });
-            input.value = ''; saveState(); openSettings(); refreshInterface();
+            if(!name) return; 
+            state.roster.push({ id: Date.now(), name: name });
+            input.value = ''; saveState(); renderRosterList();
         }
+        
         function removeAthlete(id) {
-            if(state.athletes.length <= 1) return alert("Devi avere almeno un atleta.");
-            if(!confirm("Eliminare?")) return;
-            state.athletes = state.athletes.filter(a => a.id !== id); state.history = state.history.filter(h => h.athleteId !== id);
-            if(state.currentAthleteId === id) state.currentAthleteId = state.athletes[0].id;
-            saveState(); openSettings(); refreshInterface();
+            if(!confirm("Rimuovere definitivamente questo atleta dal Roster?")) return;
+            state.roster = state.roster.filter(a => a.id !== id);
+            // Lo rimuoviamo anche dai presenti se c'era
+            state.activeAthletes = state.activeAthletes.filter(a => a.id !== id);
+            saveState(); renderRosterList(); refreshInterface();
         }
 
-        function newSession() {
-            if(!confirm("Vuoi iniziare una nuova sessione?\nI colpi verranno cancellati, gli atleti rimarranno.")) return;
-            state.history = []; state.currentShots = []; state.reviewMode = null;
-            state.athletes.forEach(a => { a.seriesT = 1; a.seriesP = 1; });
-            saveState(); refreshInterface(); closeSettings();
-        }
-        function factoryReset() {
-            if(!confirm("ATTENZIONE: Reset totale?")) return;
-            localStorage.removeItem(STORAGE_KEY); state.currentShots = []; state.history = []; state.reviewMode = null;
-            loadState(); refreshInterface(); closeSettings();
-        }
-
-        // GESTIONE DEL TOUCH AGGIORNATA
-        targetEl.addEventListener('pointerdown', (e) => {
-            if(state.reviewMode) return; 
-            
-            // Riposiziona lo slider se necessario
-            if (parseInt(slider.value) < state.currentShots.length) { 
-                slider.value = state.currentShots.length; updateVisualsFromSlider(); 
+        function exportRoster() {
+            const dataStr = JSON.stringify(state.roster, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const file = new File([blob], "roster_squadra.json", { type: "application/json" });
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                navigator.share({ files: [file], title: 'Roster Atleti Biathlon' }).catch(e => console.log('Condivisione annullata', e));
+            } else {
+                const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.download = "roster_squadra.json"; link.href = url; link.click(); URL.revokeObjectURL(url);
             }
+        }
 
+        function importRoster(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if(Array.isArray(imported) && imported.length > 0 && imported[0].name) {
+                        if(confirm(`Trovati ${imported.length} atleti. Vuoi SOSTITUIRE il tuo roster attuale con questo?`)) {
+                            state.roster = imported; saveState(); renderRosterList(); alert("Roster importato!");
+                        }
+                    } else { alert("Il file JSON non ha il formato corretto."); }
+                } catch(err) { alert("Errore di lettura del file."); }
+            };
+            reader.readAsText(file);
+            e.target.value = ''; // Reset input
+        }
+
+        function factoryReset() {
+            if(!confirm("ATTENZIONE: Reset totale? Perderai il roster e le impostazioni.")) return;
+            localStorage.removeItem(STORAGE_KEY); location.reload();
+        }
+
+        // --- GESTIONE STORICO ---
+        function openHistory() {
+            if(state.activeAthletes.length === 0) return alert("Nessun atleta attivo.");
+            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
+            document.getElementById('history-athlete-name').textContent = athlete.name;
+            const list = document.getElementById('modal-history-list'); list.innerHTML = '';
+            const athleteHistory = state.history.filter(h => h.athleteId === athlete.id).reverse();
+            
+            if(athleteHistory.length === 0) { list.innerHTML = '<li style="text-align:center; padding: 20px 0; color:#aaa;">Nessuna serie salvata oggi.</li>';
+            } else {
+                athleteHistory.forEach(h => {
+                    const li = document.createElement('li'); li.className = 'list-item';
+                    const date = new Date(h.timestamp); const dateStr = `${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+                    li.innerHTML = `<div class="list-item-info"><strong>Serie ${h.series}</strong><span class="list-item-date">${dateStr} - ${h.shots.length} colpi</span></div><div class="list-item-btns"><button onclick="viewHistoryItem(${h.id})">Apri</button><button class="danger btn-delete" onclick="deleteHistoryItem(${h.id})">X</button></div>`;
+                    list.appendChild(li);
+                });
+            }
+            document.getElementById('history-modal').style.display = 'flex';
+        }
+        function closeHistory() { document.getElementById('history-modal').style.display = 'none'; }
+        function deleteHistoryItem(id) { if(!confirm("Eliminare?")) return; state.history = state.history.filter(h => h.id !== id); saveState(); openHistory(); }
+        function viewHistoryItem(id) { const item = state.history.find(h => h.id === id); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
+        function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
+
+        // --- GESTIONE TARGET (Touch & Drag) ---
+        targetEl.addEventListener('pointerdown', (e) => {
+            if(state.reviewMode || state.activeAthletes.length === 0) return; 
+            if (parseInt(slider.value) < state.currentShots.length) { slider.value = state.currentShots.length; updateVisualsFromSlider(); }
             if (e.target.classList.contains('shot')) {
                 const shotNode = e.target;
-                
-                // Avvia il timer di 0.8s
                 longPressTimer = setTimeout(() => {
-                    isDragging = true;
-                    draggedShot = shotNode;
-                    shotNode.classList.add('dragging');
-                    targetEl.setPointerCapture(e.pointerId);
-                    
-                    // Feedback tattile leggero se supportato
+                    isDragging = true; draggedShot = shotNode; shotNode.classList.add('dragging'); targetEl.setPointerCapture(e.pointerId);
                     if (navigator.vibrate) navigator.vibrate(50);
                 }, 800);
-
             } else if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
                 if (state.currentShots.length >= MAX_SHOTS) return;
-                const rect = targetEl.getBoundingClientRect(); 
-                createShot(e.clientX - rect.left, e.clientY - rect.top);
+                const rect = targetEl.getBoundingClientRect(); createShot(e.clientX - rect.left, e.clientY - rect.top);
             }
         });
 
         targetEl.addEventListener('pointermove', (e) => {
             if (isDragging && draggedShot && !state.reviewMode) {
                 const rect = targetEl.getBoundingClientRect();
-                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width)); 
-                let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
-                
+                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width)); let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
                 draggedShot.style.left = `${x}px`; draggedShot.style.top = `${y}px`;
-                const seq = parseInt(draggedShot.dataset.seq);
-                state.currentShots[seq - 1].x = x; 
-                state.currentShots[seq - 1].y = y;
+                state.currentShots[parseInt(draggedShot.dataset.seq) - 1].x = x; state.currentShots[parseInt(draggedShot.dataset.seq) - 1].y = y;
             }
         });
 
         const handlePointerUp = (e) => {
-            // Se c'era un timer in corso (tap durato meno di 0.8s)
             if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-
-                // Se ho mollato il dito ancora sopra un colpo esistente ed è stato veloce, piazzo un colpo nuovo sovrapposto.
+                clearTimeout(longPressTimer); longPressTimer = null;
                 if (e.target.classList.contains('shot')) {
                     if (state.currentShots.length >= MAX_SHOTS) return;
-                    const rect = targetEl.getBoundingClientRect();
-                    createShot(e.clientX - rect.left, e.clientY - rect.top);
+                    const rect = targetEl.getBoundingClientRect(); createShot(e.clientX - rect.left, e.clientY - rect.top);
                 }
             }
-
-            // Se stavo trascinando, concludo il drag
             if (isDragging && draggedShot) {
-                draggedShot.classList.remove('dragging');
-                targetEl.releasePointerCapture(e.pointerId);
-                draggedShot = null;
-                isDragging = false;
-                saveState();
+                draggedShot.classList.remove('dragging'); targetEl.releasePointerCapture(e.pointerId); draggedShot = null; isDragging = false; saveState();
             }
         };
 
-        targetEl.addEventListener('pointerup', handlePointerUp);
-        targetEl.addEventListener('pointercancel', handlePointerUp); // per sicurezza su iOS
+        targetEl.addEventListener('pointerup', handlePointerUp); targetEl.addEventListener('pointercancel', handlePointerUp); 
 
-        function undoLastShot() {
-            if (state.reviewMode || state.currentShots.length === 0) return;
-            state.currentShots.pop();
-            saveState();
-            renderShotsFromState();
-        }
+        function undoLastShot() { if (state.reviewMode || state.currentShots.length === 0) return; state.currentShots.pop(); saveState(); renderShotsFromState(); }
 
         function createShot(x, y) {
             const seq = state.currentShots.length + 1;
@@ -464,22 +567,39 @@
         function clearTargetAndState() { state.currentShots = []; saveState(); renderShotsFromState(); }
 
         function saveSeries() {
+            if(state.activeAthletes.length === 0) return alert("Nessun atleta selezionato.");
             if (state.currentShots.length === 0) return alert("Nessun colpo.");
-            const athlete = state.athletes.find(a => a.id === state.currentAthleteId);
-            state.history.push({
+            
+            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
+            const exportW = 400; const exportH = 440;
+            const normalizedShots = state.currentShots.map(s => {
+                const scaleX = s.bx ? (exportW / s.bx) : 1; const scaleY = s.by ? (exportH / s.by) : 1;
+                return { seq: s.seq, x: Math.round(s.x * scaleX), y: Math.round(s.y * scaleY) };
+            });
+
+            const timestampIso = new Date().toISOString();
+            const dataPacket = {
                 id: Date.now(), athleteId: athlete.id, athlete: athlete.name, position: state.currentPos,
                 series: `${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}`,
-                shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: new Date().toISOString()
-            });
+                shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: timestampIso
+            };
+            
+            const cloudPacket = {
+                timestamp: timestampIso, coach: state.coachName || "Non specificato", athlete: athlete.name, position: state.currentPos, 
+                series: dataPacket.series, shots: normalizedShots
+            };
+
+            state.history.push(dataPacket);
+            state.syncQueue.push(cloudPacket);
+            
             if (state.currentPos === 'T') athlete.seriesT++; else athlete.seriesP++;
             clearTargetAndState(); updateHeader();
         }
 
+        // --- ESPORTAZIONE ZIP E IMMAGINI ---
         function generateCanvasBlob(shots, w, h) {
             return new Promise((resolve) => {
-                const canvas = document.createElement('canvas');
-                canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d');
-
+                const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, w, h);
                 const cx = w / 2; const cy = h / 2; const targetRadius = (w * 0.90) / 2; 
                 ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(cx, cy, targetRadius, 0, Math.PI * 2); ctx.fill();
@@ -498,9 +618,10 @@
         }
 
         function exportImage() {
+            if(state.activeAthletes.length === 0) return;
             const w = targetEl.offsetWidth; const h = targetEl.offsetHeight;
             generateCanvasBlob(getActiveShots().slice(0, parseInt(slider.value)), w, h).then(blob => {
-                let fileName = state.reviewMode ? `${state.reviewMode.athlete}_storico_${state.reviewMode.series}.png` : `${state.athletes.find(a => a.id === state.currentAthleteId).name}_${state.currentPos === 'T' ? state.athletes.find(a => a.id === state.currentAthleteId).seriesT : state.athletes.find(a => a.id === state.currentAthleteId).seriesP}${state.currentPos}.png`;
+                let fileName = state.reviewMode ? `${state.reviewMode.athlete}_storico_${state.reviewMode.series}.png` : `${state.activeAthletes.find(a => a.id === state.currentAthleteId).name}_${state.currentPos === 'T' ? state.activeAthletes.find(a => a.id === state.currentAthleteId).seriesT : state.activeAthletes.find(a => a.id === state.currentAthleteId).seriesP}${state.currentPos}.png`;
                 const file = new File([blob], fileName, { type: "image/png" });
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                     navigator.share({ files: [file], title: 'Serie Biathlon' }).catch(e => console.log('Condivisione annullata', e));
@@ -511,29 +632,23 @@
         }
 
         async function exportFullSession() {
-            if (typeof JSZip === 'undefined') return alert("Libreria ZIP non caricata. Assicurati di essere connesso a internet e riavvia l'app.");
+            if (typeof JSZip === 'undefined') return alert("Libreria ZIP non caricata. Riavvia l'app sotto Wi-Fi.");
             if (state.history.length === 0) return alert("Nessuna serie salvata nello storico.");
 
-            const btn = document.getElementById('btn-export-zip');
-            const originalText = btn.textContent;
+            const btn = document.getElementById('btn-export-zip'); const originalText = btn.textContent;
             btn.textContent = "⏳ Generazione ZIP in corso..."; btn.disabled = true;
 
             try {
                 const zip = new JSZip();
-                const dateStr = new Date().toISOString().split('T')[0];
-                const rootName = `Sessione_${dateStr}`;
-                const rootFolder = zip.folder(rootName);
-
+                const dateStr = new Date().toISOString().split('T')[0]; const rootName = `Sessione_${dateStr}`; const rootFolder = zip.folder(rootName);
                 const exportW = 400; const exportH = 440; 
 
                 for (const h of state.history) {
                     const athleteFolder = rootFolder.folder(h.athlete);
                     const normalizedShots = h.shots.map(s => {
-                        const scaleX = s.bx ? (exportW / s.bx) : 1;
-                        const scaleY = s.by ? (exportH / s.by) : 1;
+                        const scaleX = s.bx ? (exportW / s.bx) : 1; const scaleY = s.by ? (exportH / s.by) : 1;
                         return { seq: s.seq, x: s.x * scaleX, y: s.y * scaleY };
                     });
-
                     const blob = await generateCanvasBlob(normalizedShots, exportW, exportH);
                     athleteFolder.file(`Serie_${h.series}.png`, blob);
                 }
@@ -544,16 +659,9 @@
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: [zipFile] })) {
                     await navigator.share({ files: [zipFile], title: `Esportazione Sessione Biathlon` });
                 } else {
-                    const url = URL.createObjectURL(zipBlob);
-                    const link = document.createElement('a');
-                    link.download = `${rootName}.zip`; link.href = url; link.click();
-                    URL.revokeObjectURL(url);
+                    const url = URL.createObjectURL(zipBlob); const link = document.createElement('a'); link.download = `${rootName}.zip`; link.href = url; link.click(); URL.revokeObjectURL(url);
                 }
-            } catch(e) {
-                console.error(e); alert("Errore durante l'esportazione.");
-            } finally {
-                btn.textContent = originalText; btn.disabled = false;
-            }
+            } catch(e) { console.error(e); alert("Errore durante l'esportazione."); } finally { btn.textContent = originalText; btn.disabled = false; }
         }
 
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
