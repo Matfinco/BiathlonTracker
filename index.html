@@ -335,19 +335,28 @@
             if(!state.coachName) return alert("Devi inserire la tua firma nelle impostazioni.");
             
             const btn = document.getElementById('btn-sync'); 
-            const originalText = btn.textContent;
             btn.textContent = "⏳ Invio..."; btn.disabled = true;
 
             try {
                 const response = await fetch(state.cloudUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(state.syncQueue)
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(state.syncQueue)
                 });
                 const result = await response.json();
                 if(result.status === "success") {
-                    state.syncQueue = []; saveState(); alert("Sincronizzazione completata!");
-                } else { alert("Errore dallo script: " + result.error); }
-            } catch (err) { alert("Errore di rete. Dettaglio: " + err.message); } 
-            finally { btn.disabled = false; updateSyncBadge(); }
+                    state.syncQueue = []; 
+                    saveState(); 
+                    alert("Sincronizzazione completata!");
+                } else { 
+                    alert("Errore dallo script: " + result.error); 
+                }
+            } catch (err) { 
+                alert("Possibile rallentamento di rete. Se i dati compaiono sul foglio, premi nuovamente sincronizza senza timore di duplicare: il sistema ora scarta i duplicati in automatico."); 
+            } finally { 
+                btn.disabled = false; 
+                updateSyncBadge(); 
+            }
         }
 
         // --- GESTIONE MODALI ---
@@ -541,16 +550,27 @@
                 return { seq: s.seq, x: Math.round(s.x * scaleX), y: Math.round(s.y * scaleY) };
             });
 
+            const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
             const timestampIso = new Date().toISOString();
+            
             const dataPacket = {
-                id: Date.now(), athleteId: athlete.id, athlete: athlete.name, position: state.currentPos,
+                id: uniqueId, 
+                athleteId: athlete.id, 
+                athlete: athlete.name, 
+                position: state.currentPos,
                 series: `${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}`,
-                shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: timestampIso
+                shots: JSON.parse(JSON.stringify(state.currentShots)), 
+                timestamp: timestampIso
             };
             
             const cloudPacket = {
-                timestamp: timestampIso, coach: state.coachName || "Non specificato", athlete: athlete.name, position: state.currentPos, 
-                series: dataPacket.series, shots: normalizedShots
+                id: uniqueId, // <-- FONDAMENTALE PER LA DE-DUPLICAZIONE
+                timestamp: timestampIso, 
+                coach: state.coachName || "Non specificato", 
+                athlete: athlete.name, 
+                position: state.currentPos, 
+                series: dataPacket.series, 
+                shots: normalizedShots
             };
 
             state.history.push(dataPacket); state.syncQueue.push(cloudPacket);
