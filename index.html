@@ -23,6 +23,9 @@
         }
         body.review-mode { background-color: var(--review-bg); }
         
+        /* Blocco scroll quando modale aperta */
+        body.modal-open { overflow: hidden; }
+
         .header { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; margin-top: 10px; }
         .header-btns { display: flex; gap: 5px; }
         .header-btns button { padding: 8px 12px; font-size: 14px; min-width: auto; position: relative; }
@@ -59,8 +62,8 @@
         .slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
         .slider-container span { min-width: 60px; text-align: center; font-weight: bold; }
 
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .modal { background: #222; width: 100%; max-width: 400px; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; overscroll-behavior: none; }
+        .modal { background: #222; width: 100%; max-width: 400px; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .modal h3 { margin: 0 0 10px 0; border-bottom: 1px solid #444; padding-bottom: 5px; font-size: 18px; }
         .list-container { list-style: none; padding: 0; margin: 0; }
         .list-item { display: flex; justify-content: space-between; align-items: center; background: #333; padding: 10px 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px;}
@@ -70,9 +73,15 @@
         .list-item-btns button:not(.btn-delete) { padding: 6px 10px; min-width: auto; font-size: 12px; }
         
         .input-row { display: flex; gap: 10px; }
+        .compact-btns { display: flex; gap: 10px; }
+        .compact-btns button { padding: 8px; font-size: 13px; }
+        
         .section-box { background: #333; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; border: 1px solid #444; }
-        .section-box p { margin: 0; font-size: 12px; color: #ccc; }
         .section-box label { font-size: 12px; font-weight: bold; color: #aaa;}
+        
+        /* Gestione fisarmonica per il cloud */
+        .cloud-content { display: none; margin-top: 10px; }
+        .cloud-content.active { display: flex; flex-direction: column; gap: 10px; }
         
         .checklist { max-height: 250px; overflow-y: auto; background: #333; border-radius: 8px; padding: 10px; border: 1px solid #444;}
         .checklist label { display: flex; align-items: center; gap: 10px; padding: 12px 5px; border-bottom: 1px solid #444; font-size: 16px; cursor: pointer;}
@@ -136,31 +145,39 @@
         <div class="modal">
             <h3>⚙️ Impostazioni App</h3>
             
-            <div class="section-box">
+            <!-- Sottomenù Sincronizzazione Cloud -->
+            <button class="secondary" onclick="toggleCloudConfig()" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>☁️ Configura Cloud & Firma</span>
+                <span>▼</span>
+            </button>
+            
+            <div class="cloud-content section-box" id="cloud-config-panel">
                 <label>LA TUA FIRMA (ALLENATORE)</label>
                 <input type="text" id="coach-name" placeholder="Es. Matteo Finco" onchange="saveConfig()">
                 
-                <label style="margin-top: 10px;">URL GOOGLE SHEETS (CLOUD)</label>
+                <label style="margin-top: 10px;">URL GOOGLE SHEETS</label>
                 <input type="url" id="sheet-url" placeholder="https://script.google.com/..." onchange="saveConfig()">
                 <button class="accent" id="btn-sync" onclick="syncWithCloud()">☁️ Sincronizza Dati</button>
             </div>
 
-            <h3 style="margin-top: 10px;">Roster Globale</h3>
+            <h3 style="margin-top: 10px;">Archivio Atleti</h3>
             <div class="input-row">
                 <input type="text" id="new-athlete-name" placeholder="Nuovo atleta...">
                 <button onclick="addAthlete()">Aggiungi</button>
             </div>
             <ul class="list-container" id="modal-athlete-list" style="max-height: 150px; overflow-y: auto;"></ul>
             
-            <div class="input-row">
-                <button class="secondary" onclick="exportRoster()">📤 Esporta Roster</button>
+            <div class="compact-btns">
+                <button class="secondary" onclick="exportRoster()">📤 Esporta Archivio</button>
                 <button class="secondary" onclick="document.getElementById('import-roster-file').click()">📥 Importa</button>
                 <input type="file" id="import-roster-file" accept=".json" style="display: none;" onchange="importRoster(event)">
             </div>
 
             <h3 style="margin-top: 10px;">Dati e Backup</h3>
-            <button class="success" id="btn-export-zip" onclick="exportFullSession()">📥 Scarica Backup Sessione (ZIP)</button>
-            <button class="danger" onclick="factoryReset()" style="margin-top: 10px;">⚠️ Cancella Tutto (Reset Fabbrica)</button>
+            <div class="compact-btns">
+                <button class="success" id="btn-export-zip" onclick="exportFullSession()">📥 Esporta Sessione (ZIP)</button>
+                <button class="danger" onclick="factoryReset()">⚠️ Reset Totale App</button>
+            </div>
             <button class="secondary" onclick="closeSettings()" style="margin-top: 10px;">Chiudi</button>
         </div>
     </div>
@@ -196,16 +213,10 @@
         const STORAGE_KEY = 'biathlon_tracker_data_v4';
 
         let state = {
-            coachName: "",
-            cloudUrl: "",
+            coachName: "", cloudUrl: "",
             roster: [ { id: 1, name: "Atleta di Test" } ],
             activeAthletes: [ { id: 1, name: "Atleta di Test", seriesT: 1, seriesP: 1 } ],
-            currentAthleteId: 1,
-            currentPos: 'T',
-            currentShots: [],
-            history: [],
-            syncQueue: [],
-            reviewMode: null 
+            currentAthleteId: 1, currentPos: 'T', currentShots: [], history: [], syncQueue: [], reviewMode: null 
         };
 
         const targetEl = document.getElementById('target-box');
@@ -213,24 +224,37 @@
         const slider = document.getElementById('time-slider');
         const sliderVal = document.getElementById('slider-val');
         
-        let draggedShot = null;
-        let isDragging = false;
-        let longPressTimer = null;
+        let draggedShot = null; let isDragging = false; let longPressTimer = null;
 
         function init() {
-            loadState();
-            refreshInterface();
+            loadState(); refreshInterface();
             document.getElementById('coach-name').value = state.coachName;
             document.getElementById('sheet-url').value = state.cloudUrl;
             slider.addEventListener('input', updateVisualsFromSlider);
+            
+            // Blocco di sicurezza addizionale per iOS Safari (previene il trascinamento dell'overlay)
+            document.querySelectorAll('.modal-overlay').forEach(overlay => {
+                overlay.addEventListener('touchmove', (e) => {
+                    if(e.target === overlay) e.preventDefault();
+                }, { passive: false });
+            });
+        }
+
+        // Funzioni centralizzate per apertura/chiusura modali con blocco scroll
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            document.body.classList.add('modal-open');
+        }
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+            document.body.classList.remove('modal-open');
         }
 
         function getActiveShots() { return state.reviewMode ? state.reviewMode.shots : state.currentShots; }
 
         function saveState() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            updateSyncBadge();
-            if(!state.reviewMode) updateSliderMax();
+            updateSyncBadge(); if(!state.reviewMode) updateSliderMax();
         }
 
         function loadState() {
@@ -238,33 +262,15 @@
             if (saved) {
                 try {
                     const p = JSON.parse(saved);
-                    state.coachName = p.coachName || "";
-                    state.cloudUrl = p.cloudUrl || "";
-                    
-                    // Migrazione dai vecchi formati (v2/v3) a v4
-                    if (p.roster) {
-                        state.roster = p.roster;
-                    } else if (p.athletes) {
-                        state.roster = p.athletes.map(a => ({id: a.id, name: a.name}));
-                    }
-                    
-                    if (p.activeAthletes) {
-                        state.activeAthletes = p.activeAthletes;
-                    } else if (p.athletes) {
-                        state.activeAthletes = p.athletes;
-                    }
-
-                    state.currentAthleteId = p.currentAthleteId;
-                    state.currentPos = p.currentPos || 'T';
-                    state.currentShots = p.currentShots || [];
-                    state.history = p.history || [];
-                    state.syncQueue = p.syncQueue || [];
-                    
+                    state.coachName = p.coachName || ""; state.cloudUrl = p.cloudUrl || "";
+                    if (p.roster) { state.roster = p.roster; } else if (p.athletes) { state.roster = p.athletes.map(a => ({id: a.id, name: a.name})); }
+                    if (p.activeAthletes) { state.activeAthletes = p.activeAthletes; } else if (p.athletes) { state.activeAthletes = p.athletes; }
+                    state.currentAthleteId = p.currentAthleteId; state.currentPos = p.currentPos || 'T';
+                    state.currentShots = p.currentShots || []; state.history = p.history || []; state.syncQueue = p.syncQueue || [];
                     if(!state.roster.length) forceDefaultAthlete();
                 } catch (e) { forceDefaultAthlete(); }
             } else { forceDefaultAthlete(); }
             
-            // Fallback se l'atleta selezionato non è più tra i presenti
             if(!state.activeAthletes.find(a => a.id === state.currentAthleteId)) {
                 if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
             }
@@ -272,28 +278,22 @@
 
         function forceDefaultAthlete() {
             const id = Date.now();
-            state.roster = [{ id: id, name: "Atleta di Test" }];
-            state.activeAthletes = [{ id: id, name: "Atleta di Test", seriesT: 1, seriesP: 1 }];
+            state.roster = [{ id: id, name: "Atleta di Test" }]; state.activeAthletes = [{ id: id, name: "Atleta di Test", seriesT: 1, seriesP: 1 }];
             state.currentAthleteId = id;
         }
 
         function refreshInterface() {
             athleteSelect.innerHTML = '';
             if(state.activeAthletes.length === 0) {
-                const opt = document.createElement('option');
-                opt.textContent = "-- Nessun atleta presente --";
-                athleteSelect.appendChild(opt);
-                athleteSelect.disabled = true;
+                const opt = document.createElement('option'); opt.textContent = "-- Nessun atleta presente --";
+                athleteSelect.appendChild(opt); athleteSelect.disabled = true;
             } else {
                 athleteSelect.disabled = false;
                 state.activeAthletes.forEach(a => {
-                    const opt = document.createElement('option');
-                    opt.value = a.id; opt.textContent = a.name;
-                    if(a.id === state.currentAthleteId) opt.selected = true;
-                    athleteSelect.appendChild(opt);
+                    const opt = document.createElement('option'); opt.value = a.id; opt.textContent = a.name;
+                    if(a.id === state.currentAthleteId) opt.selected = true; athleteSelect.appendChild(opt);
                 });
             }
-            
             athleteSelect.onchange = (e) => { state.currentAthleteId = parseInt(e.target.value); saveState(); updateHeader(); };
             updateHeader(); renderShotsFromState(); toggleReviewUI(); updateSyncBadge();
         }
@@ -306,9 +306,7 @@
             }
             const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
             if(!athlete) {
-                document.getElementById('display-name').textContent = "Nessuno";
-                document.getElementById('display-series').textContent = "-";
-                return;
+                document.getElementById('display-name').textContent = "Nessuno"; document.getElementById('display-series').textContent = "-"; return;
             }
             document.getElementById('display-name').textContent = athlete.name;
             const seriesNum = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
@@ -328,11 +326,13 @@
             document.getElementById('review-controls').classList.toggle('hidden', !isReview);
         }
 
-        function saveConfig() {
-            state.coachName = document.getElementById('coach-name').value.trim();
-            state.cloudUrl = document.getElementById('sheet-url').value.trim();
-            saveState();
+        // --- CLOUD E IMPOSTAZIONI ---
+        function toggleCloudConfig() {
+            const panel = document.getElementById('cloud-config-panel');
+            panel.classList.toggle('active');
         }
+
+        function saveConfig() { state.coachName = document.getElementById('coach-name').value.trim(); state.cloudUrl = document.getElementById('sheet-url').value.trim(); saveState(); }
 
         function updateSyncBadge() {
             const badge = document.getElementById('sync-badge'); const count = state.syncQueue.length;
@@ -344,15 +344,13 @@
         async function syncWithCloud() {
             if(state.syncQueue.length === 0) return alert("Tutti i dati sono già sincronizzati.");
             if(!state.cloudUrl || !state.cloudUrl.startsWith('http')) return alert("Inserisci un URL valido di Google Apps Script.");
-            if(!state.coachName) return alert("Inserisci il tuo Nome Allenatore per poter inviare i dati.");
+            if(!state.coachName) return alert("Inserisci la tua Firma (Allenatore) per poter inviare i dati.");
             
             const btn = document.getElementById('btn-sync'); btn.textContent = "⏳ Invio in corso..."; btn.disabled = true;
 
             try {
                 const response = await fetch(state.cloudUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(state.syncQueue)
+                    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(state.syncQueue)
                 });
                 const result = await response.json();
                 if(result.status === "success") {
@@ -362,13 +360,11 @@
             finally { btn.disabled = false; updateSyncBadge(); }
         }
 
-        // --- GESTIONE NUOVA SESSIONE E ROSTER ---
+        // --- GESTIONE MODALI ---
         function openNewSessionModal() {
-            const list = document.getElementById('session-checklist');
-            list.innerHTML = '';
-            
+            const list = document.getElementById('session-checklist'); list.innerHTML = '';
             if(state.roster.length === 0) {
-                list.innerHTML = "<p style='color:#ccc; text-align:center;'>Nessun atleta nel Roster.</p>";
+                list.innerHTML = "<p style='color:#ccc; text-align:center;'>Archivio atleti vuoto.</p>";
             } else {
                 state.roster.forEach(athlete => {
                     const isCurrentlyActive = state.activeAthletes.some(a => a.id === athlete.id);
@@ -377,41 +373,26 @@
                     list.appendChild(label);
                 });
             }
-            document.getElementById('new-session-modal').style.display = 'flex';
+            openModal('new-session-modal');
         }
-
-        function closeNewSessionModal() { document.getElementById('new-session-modal').style.display = 'none'; }
+        function closeNewSessionModal() { closeModal('new-session-modal'); }
 
         function startNewSession() {
-            if(state.currentShots.length > 0 && !confirm("Hai dei colpi non salvati sul bersaglio. Vuoi procedere comunque?")) return;
-            
+            if(state.currentShots.length > 0 && !confirm("Hai colpi non salvati sul bersaglio. Procedere comunque?")) return;
             const checkboxes = document.querySelectorAll('#session-checklist input[type="checkbox"]:checked');
             const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
             
-            if(selectedIds.length === 0) {
-                if(!confirm("Non hai selezionato nessun atleta. Avviare sessione vuota?")) return;
-            }
+            if(selectedIds.length === 0 && !confirm("Avviare sessione vuota?")) return;
 
-            // Svuota storico temporaneo e prepara i nuovi presenti
-            state.history = []; 
-            state.currentShots = []; 
-            state.reviewMode = null;
-            
-            state.activeAthletes = state.roster
-                .filter(a => selectedIds.includes(a.id))
-                .map(a => ({ id: a.id, name: a.name, seriesT: 1, seriesP: 1 }));
-            
+            state.history = []; state.currentShots = []; state.reviewMode = null;
+            state.activeAthletes = state.roster.filter(a => selectedIds.includes(a.id)).map(a => ({ id: a.id, name: a.name, seriesT: 1, seriesP: 1 }));
             if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
             
             saveState(); refreshInterface(); closeNewSessionModal();
         }
 
-        // --- IMPOSTAZIONI E ROSTER GLOBALE ---
-        function openSettings() {
-            document.getElementById('settings-modal').style.display = 'flex';
-            renderRosterList();
-        }
-        function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+        function openSettings() { renderRosterList(); openModal('settings-modal'); }
+        function closeSettings() { closeModal('settings-modal'); }
         
         function renderRosterList() {
             const list = document.getElementById('modal-athlete-list'); list.innerHTML = '';
@@ -424,27 +405,24 @@
 
         function addAthlete() {
             const input = document.getElementById('new-athlete-name'); const name = input.value.trim();
-            if(!name) return; 
-            state.roster.push({ id: Date.now(), name: name });
+            if(!name) return; state.roster.push({ id: Date.now(), name: name });
             input.value = ''; saveState(); renderRosterList();
         }
         
         function removeAthlete(id) {
-            if(!confirm("Rimuovere definitivamente questo atleta dal Roster?")) return;
+            if(!confirm("Rimuovere definitivamente questo atleta dall'archivio?")) return;
             state.roster = state.roster.filter(a => a.id !== id);
-            // Lo rimuoviamo anche dai presenti se c'era
             state.activeAthletes = state.activeAthletes.filter(a => a.id !== id);
             saveState(); renderRosterList(); refreshInterface();
         }
 
         function exportRoster() {
-            const dataStr = JSON.stringify(state.roster, null, 2);
-            const blob = new Blob([dataStr], { type: "application/json" });
-            const file = new File([blob], "roster_squadra.json", { type: "application/json" });
+            const blob = new Blob([JSON.stringify(state.roster, null, 2)], { type: "application/json" });
+            const file = new File([blob], "archivio_atleti.json", { type: "application/json" });
             if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                navigator.share({ files: [file], title: 'Roster Atleti Biathlon' }).catch(e => console.log('Condivisione annullata', e));
+                navigator.share({ files: [file], title: 'Archivio Atleti Biathlon' }).catch(e => console.log('Condivisione annullata'));
             } else {
-                const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.download = "roster_squadra.json"; link.href = url; link.click(); URL.revokeObjectURL(url);
+                const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.download = "archivio_atleti.json"; link.href = url; link.click(); URL.revokeObjectURL(url);
             }
         }
 
@@ -455,18 +433,17 @@
                 try {
                     const imported = JSON.parse(event.target.result);
                     if(Array.isArray(imported) && imported.length > 0 && imported[0].name) {
-                        if(confirm(`Trovati ${imported.length} atleti. Vuoi SOSTITUIRE il tuo roster attuale con questo?`)) {
-                            state.roster = imported; saveState(); renderRosterList(); alert("Roster importato!");
+                        if(confirm(`Trovati ${imported.length} atleti. SOSTITUIRE l'archivio attuale?`)) {
+                            state.roster = imported; saveState(); renderRosterList(); alert("Archivio importato!");
                         }
-                    } else { alert("Il file JSON non ha il formato corretto."); }
-                } catch(err) { alert("Errore di lettura del file."); }
+                    } else { alert("File JSON non valido."); }
+                } catch(err) { alert("Errore lettura file."); }
             };
-            reader.readAsText(file);
-            e.target.value = ''; // Reset input
+            reader.readAsText(file); e.target.value = ''; 
         }
 
         function factoryReset() {
-            if(!confirm("ATTENZIONE: Reset totale? Perderai il roster e le impostazioni.")) return;
+            if(!confirm("ATTENZIONE: Reset totale? Perderai l'archivio e le impostazioni.")) return;
             localStorage.removeItem(STORAGE_KEY); location.reload();
         }
 
@@ -487,9 +464,9 @@
                     list.appendChild(li);
                 });
             }
-            document.getElementById('history-modal').style.display = 'flex';
+            openModal('history-modal');
         }
-        function closeHistory() { document.getElementById('history-modal').style.display = 'none'; }
+        function closeHistory() { closeModal('history-modal'); }
         function deleteHistoryItem(id) { if(!confirm("Eliminare?")) return; state.history = state.history.filter(h => h.id !== id); saveState(); openHistory(); }
         function viewHistoryItem(id) { const item = state.history.find(h => h.id === id); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
         function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
@@ -527,9 +504,7 @@
                     const rect = targetEl.getBoundingClientRect(); createShot(e.clientX - rect.left, e.clientY - rect.top);
                 }
             }
-            if (isDragging && draggedShot) {
-                draggedShot.classList.remove('dragging'); targetEl.releasePointerCapture(e.pointerId); draggedShot = null; isDragging = false; saveState();
-            }
+            if (isDragging && draggedShot) { draggedShot.classList.remove('dragging'); targetEl.releasePointerCapture(e.pointerId); draggedShot = null; isDragging = false; saveState(); }
         };
 
         targetEl.addEventListener('pointerup', handlePointerUp); targetEl.addEventListener('pointercancel', handlePointerUp); 
@@ -589,14 +564,11 @@
                 series: dataPacket.series, shots: normalizedShots
             };
 
-            state.history.push(dataPacket);
-            state.syncQueue.push(cloudPacket);
-            
+            state.history.push(dataPacket); state.syncQueue.push(cloudPacket);
             if (state.currentPos === 'T') athlete.seriesT++; else athlete.seriesP++;
             clearTargetAndState(); updateHeader();
         }
 
-        // --- ESPORTAZIONE ZIP E IMMAGINI ---
         function generateCanvasBlob(shots, w, h) {
             return new Promise((resolve) => {
                 const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d');
