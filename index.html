@@ -26,11 +26,27 @@
         body.modal-open { overflow: hidden; }
 
         .header { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; margin-top: 10px; }
+        .header-title-container { display: flex; align-items: center; gap: 8px; }
+        .series-badge {
+            background-color: rgba(0, 122, 255, 0.2);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .series-badge:active { background-color: var(--accent); color: white; }
+
         .header-btns { display: flex; gap: 5px; }
         .header-btns button { padding: 8px 12px; font-size: 14px; min-width: auto; position: relative; }
         
         .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        select, button, input[type="range"], input[type="text"], input[type="url"] {
+        select, button, input[type="range"], input[type="text"], input[type="url"], input[type="number"] {
             padding: 12px; font-size: 14px; border-radius: 8px; border: none;
             background-color: #333; color: white; flex: 1; min-width: 120px; box-sizing: border-box;
         }
@@ -66,7 +82,7 @@
         .list-item-btns { display: flex; gap: 5px; align-items: center; }
         .list-item-btns button:not(.btn-delete) { padding: 6px 10px; min-width: auto; font-size: 12px; }
         
-        .input-row { display: flex; gap: 10px; }
+        .input-row { display: flex; gap: 10px; align-items: center; }
         .compact-btns { display: flex; gap: 10px; }
         .compact-btns button { padding: 8px; font-size: 13px; }
         
@@ -81,15 +97,20 @@
         .checklist label:last-child { border-bottom: none; }
         .checklist input[type="checkbox"] { flex: 0 0 auto; width: 20px; height: 20px; }
 
+        /* Stepper per selezione rapida del numero serie */
+        .stepper-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 15px 0; }
+        .stepper-btn { width: 50px; height: 50px; font-size: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; padding: 0; min-width: unset; }
+        .stepper-value { font-size: 32px; font-weight: bold; min-width: 60px; text-align: center; }
+
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <div>
+        <div class="header-title-container">
             <span id="display-name">Nessun Atleta</span>
-            <span id="display-series" style="color: var(--accent); margin-left: 8px;">0T</span>
+            <span id="display-series" class="series-badge" onclick="openSeriesModal()">1T ✏️</span>
         </div>
         <div class="header-btns" id="header-btns">
             <button class="secondary" onclick="openHistory()">Storico</button>
@@ -124,7 +145,6 @@
         <button class="danger" onclick="clearTargetAndState()">Reset</button>
     </div>
     
-    <!-- Tasti di Sistema Estratti -->
     <div class="controls" id="normal-controls-3">
         <button id="btn-sync" class="secondary" onclick="syncWithCloud()" style="flex: 1;">☁️ Sincronizzato</button>
         <button class="warning" onclick="openNewSessionModal()" style="flex: 1;">🔄 Nuova Sessione</button>
@@ -133,6 +153,25 @@
     <div class="controls hidden" id="review-controls">
         <button class="secondary" onclick="exportImage()">Condividi Immagine</button>
         <button style="background-color: #fff; color: #000;" onclick="exitReviewMode()">⬅ Torna all'Allenamento</button>
+    </div>
+
+    <!-- Modale Modifica Numero Serie -->
+    <div class="modal-overlay" id="series-modal">
+        <div class="modal">
+            <h3>🔢 Modifica Numero Serie</h3>
+            <p id="series-modal-desc" style="font-size: 13px; color: #ccc; margin-top: 0;">Imposta il numero per la serie attuale.</p>
+            
+            <div class="stepper-container">
+                <button class="secondary stepper-btn" onclick="stepSeries(-1)">−</button>
+                <div class="stepper-value" id="series-stepper-val">1</div>
+                <button class="secondary stepper-btn" onclick="stepSeries(1)">+</button>
+            </div>
+
+            <div class="input-row">
+                <button class="secondary" onclick="closeSeriesModal()">Annulla</button>
+                <button class="accent" onclick="applySeriesChange()">Conferma</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modale Impostazioni -->
@@ -181,9 +220,7 @@
             <h3>🔄 Inizia Nuova Sessione</h3>
             <p style="font-size: 13px; color: #ccc; margin-top: 0;">Seleziona gli atleti presenti al poligono oggi. I contatori delle serie ripartiranno da 1.</p>
             
-            <div class="checklist" id="session-checklist">
-                <!-- Generato via JS -->
-            </div>
+            <div class="checklist" id="session-checklist"></div>
             
             <div class="input-row">
                 <button class="secondary" onclick="closeNewSessionModal()">Annulla</button>
@@ -211,6 +248,8 @@
             activeAthletes: [ { id: 1, name: "Atleta di Test", seriesT: 1, seriesP: 1 } ],
             currentAthleteId: 1, currentPos: 'T', currentShots: [], history: [], syncQueue: [], reviewMode: null 
         };
+
+        let tempSeriesNum = 1;
 
         const targetEl = document.getElementById('target-box');
         const athleteSelect = document.getElementById('athlete-select');
@@ -284,19 +323,53 @@
         }
 
         function updateHeader() {
+            const badgeEl = document.getElementById('display-series');
             if(state.reviewMode) {
                 document.getElementById('display-name').textContent = state.reviewMode.athlete;
-                document.getElementById('display-series').textContent = `Revisione ${state.reviewMode.series}`;
+                badgeEl.textContent = `Revisione ${state.reviewMode.series}`;
+                badgeEl.style.pointerEvents = 'none';
                 return;
             }
+            badgeEl.style.pointerEvents = 'auto';
             const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
             if(!athlete) {
-                document.getElementById('display-name').textContent = "Nessuno"; document.getElementById('display-series').textContent = "-"; return;
+                document.getElementById('display-name').textContent = "Nessuno"; 
+                badgeEl.textContent = "-"; 
+                return;
             }
             document.getElementById('display-name').textContent = athlete.name;
             const seriesNum = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
-            document.getElementById('display-series').textContent = `${seriesNum}${state.currentPos}`;
+            badgeEl.textContent = `${seriesNum}${state.currentPos} ✏️`;
             document.getElementById('btn-position').textContent = `Posizione: ${state.currentPos}`;
+        }
+
+        // --- GESTIONE CAMBIO NUMERO SERIE ---
+        function openSeriesModal() {
+            if(state.reviewMode || state.activeAthletes.length === 0) return;
+            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
+            if(!athlete) return;
+            tempSeriesNum = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
+            document.getElementById('series-stepper-val').textContent = tempSeriesNum;
+            document.getElementById('series-modal-desc').textContent = `${athlete.name} - Serie a ${state.currentPos === 'T' ? 'Terra (T)' : 'Piedi (P)'}`;
+            openModal('series-modal');
+        }
+
+        function closeSeriesModal() { closeModal('series-modal'); }
+
+        function stepSeries(delta) {
+            tempSeriesNum = Math.max(1, tempSeriesNum + delta);
+            document.getElementById('series-stepper-val').textContent = tempSeriesNum;
+        }
+
+        function applySeriesChange() {
+            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
+            if(athlete) {
+                if(state.currentPos === 'T') athlete.seriesT = tempSeriesNum;
+                else athlete.seriesP = tempSeriesNum;
+                saveState();
+                updateHeader();
+            }
+            closeSeriesModal();
         }
 
         function togglePosition() { state.currentPos = state.currentPos === 'T' ? 'P' : 'T'; saveState(); updateHeader(); }
@@ -321,10 +394,10 @@
             if(syncBtn) {
                 if(count > 0) {
                     syncBtn.textContent = `☁️ Sincronizza (${count})`;
-                    syncBtn.className = ''; // Rimuove 'secondary', usa il blu di base
+                    syncBtn.className = '';
                 } else {
                     syncBtn.textContent = `☁️ Sincronizzato`;
-                    syncBtn.className = 'secondary'; // Grigiastro
+                    syncBtn.className = 'secondary';
                 }
             }
         }
@@ -339,27 +412,19 @@
 
             try {
                 const response = await fetch(state.cloudUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(state.syncQueue)
+                    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(state.syncQueue)
                 });
                 const result = await response.json();
                 if(result.status === "success") {
-                    state.syncQueue = []; 
-                    saveState(); 
-                    alert("Sincronizzazione completata!");
-                } else { 
-                    alert("Errore dallo script: " + result.error); 
-                }
+                    state.syncQueue = []; saveState(); alert("Sincronizzazione completata!");
+                } else { alert("Errore dallo script: " + result.error); }
             } catch (err) { 
                 alert("Possibile rallentamento di rete. Se i dati compaiono sul foglio, premi nuovamente sincronizza senza timore di duplicare: il sistema ora scarta i duplicati in automatico."); 
             } finally { 
-                btn.disabled = false; 
-                updateSyncBadge(); 
+                btn.disabled = false; updateSyncBadge(); 
             }
         }
 
-        // --- GESTIONE MODALI ---
         function openNewSessionModal() {
             const list = document.getElementById('session-checklist'); list.innerHTML = '';
             if(state.roster.length === 0) {
@@ -552,30 +617,36 @@
 
             const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
             const timestampIso = new Date().toISOString();
-            
+            const seriesLabel = `${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}`;
+
             const dataPacket = {
                 id: uniqueId, 
                 athleteId: athlete.id, 
                 athlete: athlete.name, 
                 position: state.currentPos,
-                series: `${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}`,
+                series: seriesLabel,
                 shots: JSON.parse(JSON.stringify(state.currentShots)), 
                 timestamp: timestampIso
             };
             
             const cloudPacket = {
-                id: uniqueId, // <-- FONDAMENTALE PER LA DE-DUPLICAZIONE
+                id: uniqueId,
                 timestamp: timestampIso, 
                 coach: state.coachName || "Non specificato", 
                 athlete: athlete.name, 
                 position: state.currentPos, 
-                series: dataPacket.series, 
+                series: seriesLabel, 
                 shots: normalizedShots
             };
 
-            state.history.push(dataPacket); state.syncQueue.push(cloudPacket);
+            state.history.push(dataPacket); 
+            state.syncQueue.push(cloudPacket);
+
+            // Incrementa il contatore per la prossima serie
             if (state.currentPos === 'T') athlete.seriesT++; else athlete.seriesP++;
-            clearTargetAndState(); updateHeader();
+            
+            clearTargetAndState(); 
+            updateHeader();
         }
 
         function generateCanvasBlob(shots, w, h) {
@@ -602,10 +673,11 @@
             if(state.activeAthletes.length === 0) return;
             const w = targetEl.offsetWidth; const h = targetEl.offsetHeight;
             generateCanvasBlob(getActiveShots().slice(0, parseInt(slider.value)), w, h).then(blob => {
-                let fileName = state.reviewMode ? `${state.reviewMode.athlete}_storico_${state.reviewMode.series}.png` : `${state.activeAthletes.find(a => a.id === state.currentAthleteId).name}_${state.currentPos === 'T' ? state.activeAthletes.find(a => a.id === state.currentAthleteId).seriesT : state.activeAthletes.find(a => a.id === state.currentAthleteId).seriesP}${state.currentPos}.png`;
+                const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
+                let fileName = state.reviewMode ? `${state.reviewMode.athlete}_storico_${state.reviewMode.series}.png` : `${athlete.name}_${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}.png`;
                 const file = new File([blob], fileName, { type: "image/png" });
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    navigator.share({ files: [file], title: 'Serie Biathlon' }).catch(e => console.log('Condivisione annullata', e));
+                    navigator.share({ files: [file], title: 'Serie Biathlon' }).catch(e => console.log('Condivisione annullata'));
                 } else {
                     const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.download = fileName; link.href = url; link.click(); URL.revokeObjectURL(url);
                 }
