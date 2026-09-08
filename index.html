@@ -46,7 +46,7 @@
         .target-cross-v { height: 100%; width: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 0; left: 50%; }
         .target-prone { width: 39.1%; aspect-ratio: 1 / 1; border: 1.5px solid rgba(255,255,255,0.6); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         .target-dot { width: 4px; height: 4px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        
+
         .shot { width: 22px; height: 22px; border-radius: 50%; position: absolute; transform: translate(-50%, -50%); border: 2px solid white; cursor: grab; z-index: 10; display: flex; justify-content: center; align-items: center; color: white; font-size: 11px; font-weight: bold; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; transition: transform 0.1s ease, background-color 0.15s ease; }        .shot.hit { background-color: #34c759; } /* Verde */
         .shot.miss { background-color: #ff3b30; } /* Rosso */
         .shot.dragging { cursor: grabbing; transform: translate(-50%, -50%) scale(1.3); }
@@ -494,8 +494,50 @@
         }
         function addAthlete() { const input = document.getElementById('new-athlete-name'); const name = input.value.trim(); if(!name) return; state.roster.push({ id: Date.now(), name: name }); input.value = ''; saveState(); renderRosterList(); }
         function removeAthlete(id) { if(!confirm("Rimuovere definitivamente?")) return; state.roster = state.roster.filter(a => a.id !== id); state.activeAthletes = state.activeAthletes.filter(a => a.id !== id); saveState(); renderRosterList(); refreshInterface(); }
-        function exportRoster() { /* Omesse per brevità come nel codice originale */ }
-        function importRoster(e) { /* Omesse per brevità come nel codice originale */ }
+        // --- ESPORTAZIONE ARCHIVIO ATLETI ---
+        function exportRoster() {
+            if (state.roster.length === 0) return alert("Nessun atleta in archivio da esportare.");
+            
+            // Converte l'array in una stringa JSON formattata in modo leggibile
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.roster, null, 2));
+            
+            // Crea un link invisibile, gli aggancia il file e lo "clicca" automaticamente
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "archivio_atleti_biathlon.json");
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        // --- IMPORTAZIONE ARCHIVIO ATLETI ---
+        function importRoster(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const importedRoster = JSON.parse(event.target.result);
+                    
+                    // Controllo base di sicurezza: verifica che sia un array
+                    if (Array.isArray(importedRoster)) {
+                        state.roster = importedRoster;
+                        saveState();
+                        renderRosterList();
+                        refreshInterface();
+                        alert("Archivio atleti importato con successo!");
+                    } else {
+                        alert("Errore: Il file non contiene una lista valida di atleti.");
+                    }
+                } catch (err) {
+                    alert("Errore critico nella lettura del file JSON.");
+                }
+                // Svuota l'input file per permettere di ricaricare lo stesso file se si sbaglia
+                e.target.value = ''; 
+            };
+            reader.readAsText(file);
+        }
         function factoryReset() { if(!confirm("ATTENZIONE: Reset totale?")) return; localStorage.removeItem(STORAGE_KEY); location.reload(); }
 
         function openHistory() {
