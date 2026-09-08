@@ -711,8 +711,118 @@
             clearTargetAndState(); updateHeader();
         }
 
-        function exportImage() { /* Omesse per brevità */ } 
-        async function exportFullSession() { /* Omesse per brevità */ }
+        function exportImage() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 400; 
+            canvas.height = 440;
+            
+            // Disegna sfondo
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, 400, 440);
+            
+            // Disegna bersaglio centrale
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.arc(200, 220, 180, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Disegna anello per posizione a Terra
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(200, 220, 70.4, 0, 2 * Math.PI);
+            ctx.stroke();
+
+            // Disegna croce centrale
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, 220); ctx.lineTo(400, 220);
+            ctx.moveTo(200, 0); ctx.lineTo(200, 440);
+            ctx.stroke();
+            
+            // Disegna i colpi a schermo
+            const shots = getActiveShots();
+            const currentPos = state.reviewMode ? state.reviewMode.position : state.currentPos;
+            
+            shots.forEach(s => {
+                const normX = (s.x / s.bx) * 400;
+                const normY = (s.y / s.by) * 440;
+                const isHit = evaluateShot(s.x, s.y, s.bx, s.by, currentPos);
+                
+                ctx.fillStyle = isHit ? '#34c759' : '#ff3b30';
+                ctx.beginPath();
+                ctx.arc(normX, normY, 11, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(s.seq, normX, normY);
+            });
+            
+            // Avvia il download
+            const a = document.createElement('a');
+            a.href = canvas.toDataURL('image/jpeg', 0.9);
+            a.download = `Rosata_${currentPos}_${Date.now()}.jpg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        async function exportFullSession() {
+            if (state.history.length === 0) return alert("Nessun dato nella sessione attuale da esportare.");
+            
+            const btn = document.getElementById('btn-export-zip');
+            const originalText = btn.textContent;
+            btn.textContent = "⏳ Preparazione...";
+            btn.disabled = true;
+
+            try {
+                const zip = new JSZip();
+                
+                // File JSON di backup
+                zip.file("backup_completo.json", JSON.stringify(state, null, 2));
+                
+                // File CSV per database
+                let csvContent = "Data,Tipo,Atleta,Posizione,Serie,N_Colpo,X,Y,Distanza,Esito\n";
+                state.history.forEach(serie => {
+                    const dateOnly = serie.timestamp.split('T')[0];
+                    serie.shots.forEach(shot => {
+                        const normX = (shot.x / shot.bx) * 400;
+                        const normY = (shot.y / shot.by) * 440;
+                        const dist = Math.round(Math.sqrt(Math.pow(normX - 200, 2) + Math.pow(normY - 220, 2)));
+                        const threshold = serie.position === 'T' ? 70 : 180;
+                        const esito = dist <= threshold ? 'Bersaglio' : 'Errore';
+                        
+                        csvContent += `${dateOnly},${serie.type},${serie.athlete},${serie.position},${serie.series},${shot.seq},${Math.round(normX)},${Math.round(normY)},${dist},${esito}\n`;
+                    });
+                });
+                zip.file("dati_sessione.csv", csvContent);
+
+                const blob = await zip.generateAsync({ type: "blob" });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Sessione_Biathlon_${new Date().toISOString().split('T')[0]}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+            } catch (err) {
+                alert("Errore durante la creazione dello ZIP: " + err.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
 
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
         init();
