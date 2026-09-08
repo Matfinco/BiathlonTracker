@@ -35,15 +35,12 @@
         
         .btn-delete { width: 36px; height: 36px; padding: 0 !important; display: flex; justify-content: center; align-items: center; flex: 0 0 auto !important; min-width: unset !important; }
         .target-container { display: flex; justify-content: center; align-items: center; margin: 10px 0; }
-        .target-box { width: 100%; max-width: 420px; aspect-ratio: 1 / 1.1; background-color: var(--target-box); position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #444; touch-action: none; }
-        .target-center { width: 90%; aspect-ratio: 1 / 1; background-color: var(--target-center); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
-        .target-cross-h { width: 100%; height: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 50%; left: 0; }
+        .target-box { width: min(100%, 65vh); max-width: 800px; aspect-ratio: 1 / 1.1; background-color: var(--target-box); position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #444; touch-action: none; margin: 0 auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }        .target-cross-h { width: 100%; height: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 50%; left: 0; }
         .target-cross-v { height: 100%; width: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 0; left: 50%; }
         .target-prone { width: 39.1%; aspect-ratio: 1 / 1; border: 1.5px solid rgba(255,255,255,0.6); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         .target-dot { width: 4px; height: 4px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-        .shot { width: 22px; height: 22px; border-radius: 50%; position: absolute; transform: translate(-50%, -50%); border: 2px solid white; cursor: grab; z-index: 10; display: flex; justify-content: center; align-items: center; color: white; font-size: 11px; font-weight: bold; user-select: none; transition: transform 0.1s ease, background-color 0.15s ease; }
-        .shot.hit { background-color: #34c759; } /* Verde */
+        .shot { width: 22px; height: 22px; border-radius: 50%; position: absolute; transform: translate(-50%, -50%); border: 2px solid white; cursor: grab; z-index: 10; display: flex; justify-content: center; align-items: center; color: white; font-size: 11px; font-weight: bold; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; transition: transform 0.1s ease, background-color 0.15s ease; }        .shot.hit { background-color: #34c759; } /* Verde */
         .shot.miss { background-color: #ff3b30; } /* Rosso */
         .shot.dragging { cursor: grabbing; transform: translate(-50%, -50%) scale(1.3); }
         .slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
