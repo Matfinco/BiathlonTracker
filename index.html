@@ -376,16 +376,26 @@
             document.getElementById('series-stepper-val').textContent = `${modalSeriesValues[modalSelectedPos]}${modalSelectedPos}`;
         }
         function stepSeries(delta) { modalSeriesValues[modalSelectedPos] = Math.max(1, modalSeriesValues[modalSelectedPos] + delta); updateModalPosUI(); }
+        
         function applySeriesChange() {
             const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
             if(athlete) {
-                athlete.seriesT = modalSeriesValues.T; athlete.seriesP = modalSeriesValues.P;
-                state.currentPos = modalSelectedPos; saveState(); updateHeader();
+                athlete.seriesT = modalSeriesValues.T; 
+                athlete.seriesP = modalSeriesValues.P;
+                state.currentPos = modalSelectedPos; 
+                saveState(); 
+                updateHeader();
+                renderShotsFromState(); // Forza il ricalcolo dei colori
             }
             closeSeriesModal();
         }
 
-        function togglePosition() { state.currentPos = state.currentPos === 'T' ? 'P' : 'T'; saveState(); updateHeader(); }
+        function togglePosition() { 
+            state.currentPos = state.currentPos === 'T' ? 'P' : 'T'; 
+            saveState(); 
+            updateHeader(); 
+            renderShotsFromState(); // Forza il ricalcolo dei colori
+        }
         
         function toggleMode() {
             state.currentMode = state.currentMode === 'Allenamento' ? 'Azzeramento' : 'Allenamento';
