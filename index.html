@@ -503,6 +503,20 @@
         function viewHistoryItem(id) { const item = state.history.find(h => h.id.toString() === id.toString()); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
         function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
 
+        // --- 1. RIPRISTINATO L'ASCOLTATORE DEL TOCCO (Mancava!) ---
+        targetEl.addEventListener('pointerdown', (e) => {
+            if(state.reviewMode || state.activeAthletes.length === 0) return; 
+            if (parseInt(slider.value) < state.currentShots.length) { slider.value = state.currentShots.length; updateVisualsFromSlider(); }
+            if (e.target.classList.contains('shot')) {
+                const shotNode = e.target;
+                longPressTimer = setTimeout(() => { isDragging = true; draggedShot = shotNode; shotNode.classList.add('dragging'); targetEl.setPointerCapture(e.pointerId); if (navigator.vibrate) navigator.vibrate(50); }, 800);
+            } else if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
+                if (state.currentShots.length >= MAX_SHOTS) return;
+                const rect = targetEl.getBoundingClientRect(); createShot(e.clientX - rect.left, e.clientY - rect.top);
+            }
+        });
+
+        // --- 2. LOGICA DI TRASCINAMENTO E COLORE DINAMICO ---
         targetEl.addEventListener('pointermove', (e) => {
             if (isDragging && draggedShot && !state.reviewMode) {
                 const rect = targetEl.getBoundingClientRect();
@@ -524,15 +538,6 @@
             }
         });
 
-        targetEl.addEventListener('pointermove', (e) => {
-            if (isDragging && draggedShot && !state.reviewMode) {
-                const rect = targetEl.getBoundingClientRect();
-                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width)); let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
-                draggedShot.style.left = `${x}px`; draggedShot.style.top = `${y}px`;
-                state.currentShots[parseInt(draggedShot.dataset.seq) - 1].x = x; state.currentShots[parseInt(draggedShot.dataset.seq) - 1].y = y;
-            }
-        });
-
         const handlePointerUp = (e) => {
             if (longPressTimer) {
                 clearTimeout(longPressTimer); longPressTimer = null;
@@ -547,10 +552,13 @@
         targetEl.addEventListener('pointerup', handlePointerUp); targetEl.addEventListener('pointercancel', handlePointerUp); 
         function undoLastShot() { if (state.reviewMode || state.currentShots.length === 0) return; state.currentShots.pop(); saveState(); renderShotsFromState(); }
 
+        // --- 3. CREAZIONE E RENDERING PULITI ---
         function createShot(x, y) {
             const seq = state.currentShots.length + 1;
             state.currentShots.push({ seq, x, y, bx: targetEl.offsetWidth, by: targetEl.offsetHeight });
-            saveState(); appendShotDOM(seq, x, y); slider.value = state.currentShots.length; updateVisualsFromSlider();
+            saveState(); 
+            appendShotDOM(seq, x, y, state.currentPos); 
+            slider.value = state.currentShots.length; updateVisualsFromSlider();
         }
 
         function appendShotDOM(seq, x, y, pos) {
@@ -584,14 +592,6 @@
             slider.value = shots.length; updateSliderMax(); updateVisualsFromSlider();
         }
 
-        function createShot(x, y) {
-            const seq = state.currentShots.length + 1;
-            state.currentShots.push({ seq, x, y, bx: targetEl.offsetWidth, by: targetEl.offsetHeight });
-            saveState(); 
-            appendShotDOM(seq, x, y, state.currentPos); 
-            slider.value = state.currentShots.length; updateVisualsFromSlider();
-        }
-
         function updateSliderMax() { slider.max = getActiveShots().length; sliderVal.textContent = `${slider.value} / ${getActiveShots().length}`; }
         function updateVisualsFromSlider() {
             const visibleCount = parseInt(slider.value); sliderVal.textContent = `${visibleCount} / ${getActiveShots().length}`;
@@ -599,6 +599,7 @@
         }
         function clearTargetAndState() { state.currentShots = []; saveState(); renderShotsFromState(); }
 
+        // --- 4. SALVATAGGIO DEI DATI ---
         function saveSeries() {
             if(state.activeAthletes.length === 0) return alert("Nessun atleta selezionato.");
             if (state.currentShots.length === 0) return alert("Nessun colpo.");
