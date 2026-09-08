@@ -99,7 +99,14 @@
     <div class="controls" id="normal-controls-1">
         <select id="athlete-select"></select>
         <button id="btn-position" class="secondary" onclick="togglePosition()">Pos: T</button>
-        <button id="btn-mode" class="secondary" onclick="toggleMode()">🎯 Allenamento</button>
+        <select id="mode-select" class="secondary">
+            <option value="Azzeramento">🔧 Azzeramento</option>
+            <option value="Gara">🏁 Gara</option>
+            <option value="L2">📊 L2</option>
+            <option value="L3">📊 L3</option>
+            <option value="L4">📊 L4</option>
+            <option value="Altro">📝 Altro</option>
+        </select>
     </div>
 
     <div class="target-container">
@@ -322,10 +329,18 @@
             }
             athleteSelect.onchange = (e) => { state.currentAthleteId = parseInt(e.target.value); saveState(); updateHeader(); };
             
-            const modeBtn = document.getElementById('btn-mode');
-            modeBtn.textContent = state.currentMode === 'Allenamento' ? '🎯 Allenamento' : '🔧 Azzeramento';
-            modeBtn.className = state.currentMode === 'Allenamento' ? 'secondary' : 'warning';
-            
+            const modeSelect = document.getElementById('mode-select');
+
+            // Controllo di sicurezza: se in memoria c'è ancora il vecchio "Allenamento", lo passiamo ad "Altro"
+            const validModes = ["Azzeramento", "Gara", "L2", "L3", "L4", "Altro"];
+            if (!validModes.includes(state.currentMode)) state.currentMode = "Azzeramento";
+
+            modeSelect.value = state.currentMode;
+            modeSelect.onchange = (e) => { 
+                state.currentMode = e.target.value; 
+                saveState(); 
+            };
+
             updateHeader(); renderShotsFromState(); toggleReviewUI(); updateSyncBadge();
         }
 
