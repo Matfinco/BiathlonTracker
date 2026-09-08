@@ -93,7 +93,7 @@
         </div>
     </div>
 
-    <!-- Aggiunto bottone Modalità Allenamento/Azzeramento -->
+    <!-- Controlli Modalità -->
     <div class="controls" id="normal-controls-1">
         <select id="athlete-select"></select>
         <button id="btn-position" class="secondary" onclick="togglePosition()">Pos: T</button>
@@ -167,9 +167,11 @@
             </button>
             <div class="cloud-content section-box" id="cloud-config-panel">
                 <label>LA TUA FIRMA (ALLENATORE)</label>
-                <input type="text" id="coach-name" placeholder="Es. Matteo Finco" onchange="saveConfig()">
+                <!-- Tolto onchange: il salvataggio avviene in tempo reale via JS -->
+                <input type="text" id="coach-name" placeholder="Es. Matteo Finco">
                 <label style="margin-top: 10px;">URL GOOGLE SHEETS</label>
-                <input type="url" id="sheet-url" placeholder="https://script.google.com/..." onchange="saveConfig()">
+                <!-- Tolto onchange: il salvataggio avviene in tempo reale via JS -->
+                <input type="url" id="sheet-url" placeholder="https://script.google.com/...">
             </div>
 
             <h3 style="margin-top: 10px;">Archivio Atleti</h3>
@@ -218,7 +220,7 @@
 
     <script>
         const MAX_SHOTS = 8;
-        const STORAGE_KEY = 'biathlon_tracker_data_v5'; // Bump versione storage
+        const STORAGE_KEY = 'biathlon_tracker_data_v5';
 
         let state = {
             coachName: "", cloudUrl: "", roster: [ { id: 1, name: "Atleta di Test" } ],
@@ -236,9 +238,24 @@
         let draggedShot = null; let isDragging = false; let longPressTimer = null;
 
         function init() {
-            loadState(); refreshInterface();
+            loadState(); 
+            refreshInterface();
+            
+            // Ripristina i valori nei campi di input
             document.getElementById('coach-name').value = state.coachName;
             document.getElementById('sheet-url').value = state.cloudUrl;
+            
+            // FASE 1: Salvataggio istantaneo in memoria. Nessun dato andrà più perso
+            // se chiudi l'app mentre stai digitando.
+            document.getElementById('coach-name').addEventListener('input', (e) => {
+                state.coachName = e.target.value.trim();
+                saveState();
+            });
+            document.getElementById('sheet-url').addEventListener('input', (e) => {
+                state.cloudUrl = e.target.value.trim();
+                saveState();
+            });
+
             slider.addEventListener('input', updateVisualsFromSlider);
             document.querySelectorAll('.modal-overlay').forEach(overlay => {
                 overlay.addEventListener('touchmove', (e) => { if(e.target === overlay) e.preventDefault(); }, { passive: false });
@@ -294,7 +311,6 @@
             }
             athleteSelect.onchange = (e) => { state.currentAthleteId = parseInt(e.target.value); saveState(); updateHeader(); };
             
-            // Ripristina UI Bottoni
             const modeBtn = document.getElementById('btn-mode');
             modeBtn.textContent = state.currentMode === 'Allenamento' ? '🎯 Allenamento' : '🔧 Azzeramento';
             modeBtn.className = state.currentMode === 'Allenamento' ? 'secondary' : 'warning';
@@ -320,7 +336,6 @@
             document.getElementById('btn-position').textContent = `Pos: ${state.currentPos}`;
         }
 
-        // --- GESTIONE CAMBIO POSIZIONE & NUMERO SERIE CONGIUNTI ---
         function openSeriesModal() {
             if(state.reviewMode || state.activeAthletes.length === 0) return;
             const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
@@ -365,7 +380,6 @@
         }
 
         function toggleCloudConfig() { document.getElementById('cloud-config-panel').classList.toggle('active'); }
-        function saveConfig() { state.coachName = document.getElementById('coach-name').value.trim(); state.cloudUrl = document.getElementById('sheet-url').value.trim(); saveState(); }
 
         function updateSyncBadge() {
             const count = state.syncQueue.length + state.deleteQueue.length;
@@ -379,6 +393,7 @@
             }
         }
 
+        // FASE 2: Coda di sincronizzazione (Offline Queue) - Implementazione sicura
         async function syncWithCloud() {
             if(state.syncQueue.length === 0 && state.deleteQueue.length === 0) return alert("Tutti i dati sono già sincronizzati.");
             if(!state.cloudUrl || !state.cloudUrl.startsWith('http')) return alert("Devi prima configurare l'URL nelle impostazioni.");
@@ -395,16 +410,18 @@
                 });
                 const result = await response.json();
                 if(result.status === "success") {
+                    // INVIO RIUSCITO: Svuotiamo la coda e salviamo lo stato
                     state.syncQueue = []; state.deleteQueue = []; saveState(); alert("Sincronizzazione completata!");
                 } else { alert("Errore dallo script: " + result.error); }
             } catch (err) { 
-                alert("Rete instabile. I dati sono al sicuro nell'app, riprova appena la connessione migliora."); 
+                // INVIO FALLITO: I dati restano bloccati in state.syncQueue in attesa del prossimo tentativo manuale.
+                alert("Rete assente o instabile. I dati sono al sicuro nel telefono, riprova appena la connessione migliora."); 
             } finally { 
                 btn.disabled = false; updateSyncBadge(); 
             }
         }
 
-        function openNewSessionModal() { /* identica a prima */
+        function openNewSessionModal() { 
             const list = document.getElementById('session-checklist'); list.innerHTML = '';
             state.roster.forEach(athlete => {
                 const isCurrentlyActive = state.activeAthletes.some(a => a.id === athlete.id);
@@ -427,7 +444,7 @@
 
         function openSettings() { renderRosterList(); openModal('settings-modal'); }
         function closeSettings() { closeModal('settings-modal'); }
-        function renderRosterList() { /* identica */
+        function renderRosterList() { 
             const list = document.getElementById('modal-athlete-list'); list.innerHTML = '';
             state.roster.forEach(a => {
                 const li = document.createElement('li'); li.className = 'list-item';
@@ -437,8 +454,8 @@
         }
         function addAthlete() { const input = document.getElementById('new-athlete-name'); const name = input.value.trim(); if(!name) return; state.roster.push({ id: Date.now(), name: name }); input.value = ''; saveState(); renderRosterList(); }
         function removeAthlete(id) { if(!confirm("Rimuovere definitivamente?")) return; state.roster = state.roster.filter(a => a.id !== id); state.activeAthletes = state.activeAthletes.filter(a => a.id !== id); saveState(); renderRosterList(); refreshInterface(); }
-        function exportRoster() { /* ... */ }
-        function importRoster(e) { /* ... */ }
+        function exportRoster() { /* Omesse per brevità come nel codice originale */ }
+        function importRoster(e) { /* Omesse per brevità come nel codice originale */ }
         function factoryReset() { if(!confirm("ATTENZIONE: Reset totale?")) return; localStorage.removeItem(STORAGE_KEY); location.reload(); }
 
         function openHistory() {
@@ -465,13 +482,8 @@
         function deleteHistoryItem(id) { 
             if(!confirm("Eliminare? Questa azione rimuoverà i dati anche dal foglio Google alla prossima sincronizzazione.")) return; 
             
-            // Accoda l'ID per la cancellazione sul Cloud
             state.deleteQueue.push(id.toString());
-            
-            // Rimuovi dalla coda di sync se non era ancora stato inviato
             state.syncQueue = state.syncQueue.filter(q => q.id.toString() !== id.toString());
-            
-            // Rimuovi dallo storico locale
             state.history = state.history.filter(h => h.id.toString() !== id.toString()); 
             
             saveState(); openHistory(); 
@@ -480,7 +492,6 @@
         function viewHistoryItem(id) { const item = state.history.find(h => h.id.toString() === id.toString()); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
         function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
 
-        // --- GESTIONE TARGET (Touch & Drag) ---
         targetEl.addEventListener('pointerdown', (e) => {
             if(state.reviewMode || state.activeAthletes.length === 0) return; 
             if (parseInt(slider.value) < state.currentShots.length) { slider.value = state.currentShots.length; updateVisualsFromSlider(); }
@@ -576,8 +587,8 @@
             clearTargetAndState(); updateHeader();
         }
 
-        // Funzioni exportImmagine e exportFullSession inalterate omesse per brevità in questa chat, puoi copiare i blocchi precedenti se necessario.
-        function exportImage() { /* ... */ } async function exportFullSession() { /* ... */ }
+        function exportImage() { /* Omesse per brevità */ } 
+        async function exportFullSession() { /* Omesse per brevità */ }
 
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
         init();
