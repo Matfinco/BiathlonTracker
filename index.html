@@ -15,7 +15,7 @@
             --target-box: #f5f5f5; --target-center: #1a1a1a;
             --shot-color: #ff3b30; --review-bg: #8b4513; 
         }
-        body { margin: 0; padding: env(safe-area-inset-top, 15px) env(safe-area-inset-right, 15px) env(safe-area-inset-bottom, 15px) env(safe-area-inset-left, 15px); background-color: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; flex-direction: column; min-height: 100vh; box-sizing: border-box; transition: background-color 0.3s; }
+        body { margin: 0; padding: env(safe-area-inset-top, 15px) env(safe-area-inset-right, 15px) env(safe-area-inset-bottom, 15px) env(safe-area-inset-left, 15px); background-color: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; flex-direction: column; height: 100vh; min-height: 100vh; overflow: hidden; box-sizing: border-box; transition: background-color 0.3s; }
         body.review-mode { background-color: var(--review-bg); }
         body.modal-open { overflow: hidden; }
 
@@ -122,10 +122,44 @@
         .sync-dot { display: none; width: 10px; height: 10px; margin-left: auto; border-radius: 50%; background: #ff3b30; }
         .sync-dot.active { display: block; }
 
+        .wind-panel { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; align-items: center; width: 100%; box-sizing: border-box; }
+        .wind-intensity-control { display: flex; justify-content: center; height: 230px; margin: 0 auto; }
+        .wind-scale { position: relative; display: flex; flex-direction: column; justify-content: space-between; align-items: center; width: 100px; height: 100%; padding: 8px 0; box-sizing: border-box; }
+        .wind-level { width: 31px; height: 3px; padding: 0; min-width: 0; flex: 0 0 3px; border-radius: 3px; background: #666; border: 0; }
+        .wind-level.active { background: var(--accent); }
+        .wind-flag { position: absolute; left: 62px; bottom: 0; width: 34px; height: 34px; pointer-events: none; transition: bottom 0.15s ease; }
+        .wind-flag .flag-pole { position: absolute; left: 0; bottom: 0; width: 3px; height: 34px; border-radius: 2px; background: #f5f5f5; }
+        .wind-flag .flag-cloth { position: absolute; left: 2px; bottom: 29px; width: 25px; height: 9px; border-radius: 1px; background: #ff3b30; transform-origin: 0 50%; transform: rotate(90deg); transition: transform 0.15s ease; }
+        .wind-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
+        .wind-actions button { min-width: 0; width: 100%; }
+        .wind-intensity-range { display: none; }
+
         /* Modulo Vento */
-        .compass-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 180px; margin: 15px auto; aspect-ratio: 1; }
-        .dir-btn { border-radius: 50%; font-size: 22px; background-color: #333; padding: 0; display: flex; justify-content: center; align-items: center; aspect-ratio: 1; border: 2px solid transparent; }
+        .compass-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 180px; max-width: 100%; margin: 15px auto; aspect-ratio: 1; }
+        .dir-btn { min-width: 0; width: 100%; border-radius: 50%; font-size: 22px; background-color: #333; padding: 0; display: flex; justify-content: center; align-items: center; aspect-ratio: 1; border: 2px solid transparent; }
         .dir-btn.active { background-color: var(--accent); color: white; border: 2px solid white; transform: scale(1.1); }
+
+        @media (max-width: 600px) {
+            .badge-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+            .badge-row select, .badge-row button { min-width: 0; width: 100%; padding: 9px 6px; }
+            .target-box { width: min(100%, calc((100vh - 330px) / 1.1)); }
+            .wind-panel { grid-template-columns: 120px 1fr; gap: 8px; }
+            .wind-intensity-control { height: 190px; }
+            .wind-scale { width: 82px; }
+            .compass-grid { width: 150px; gap: 6px; margin: 8px auto; }
+            .modal { max-height: calc(100vh - 24px); padding: 14px; gap: 8px; overflow: hidden; }
+            .modal h3 { margin-bottom: 4px; }
+        }
+
+        @media (max-width: 600px) and (max-height: 700px) {
+            .wind-panel { grid-template-columns: 105px 1fr; gap: 4px; }
+            .wind-intensity-control { height: 130px; }
+            .wind-scale { width: 72px; }
+            .compass-grid { width: 120px; gap: 4px; margin: 4px auto; }
+            .dir-btn { font-size: 18px; }
+            .modal { padding: 10px; gap: 5px; }
+            .modal .input-row { margin-top: 5px !important; }
+        }
     </style>
 </head>
 <body>
@@ -308,27 +342,41 @@
         <div class="modal">
             <h3>🌬️ Condizioni Vento</h3>
 
-            <label style="font-size: 12px; font-weight: bold; color: #aaa; text-align: center;">
-                INTENSITÀ: <span id="wind-intensity-val" style="color: white; font-size: 14px;">0 (Calma)</span>
-            </label>
-            <input type="range" id="wind-intensity" min="0" max="5" value="0" step="1" oninput="updateWindUI()">
+            <div class="wind-panel">
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: bold; color: #aaa; text-align: center;">INTENSITÀ</label>
+                    <div class="wind-intensity-control" aria-label="Intensità del vento">
+                        <div class="wind-scale">
+                            <button class="wind-level" data-level="5" onclick="selectWindIntensity(5)" aria-label="Livello 6"></button>
+                            <button class="wind-level" data-level="4" onclick="selectWindIntensity(4)" aria-label="Livello 5"></button>
+                            <button class="wind-level" data-level="3" onclick="selectWindIntensity(3)" aria-label="Livello 4"></button>
+                            <button class="wind-level" data-level="2" onclick="selectWindIntensity(2)" aria-label="Livello 3"></button>
+                            <button class="wind-level" data-level="1" onclick="selectWindIntensity(1)" aria-label="Livello 2"></button>
+                            <button class="wind-level" data-level="0" onclick="selectWindIntensity(0)" aria-label="Livello 1"></button>
+                            <span id="wind-flag" class="wind-flag" aria-hidden="true"><span class="flag-pole"></span><span class="flag-cloth"></span></span>
+                        </div>
+                    </div>
+                </div>
 
-            <label style="font-size: 12px; font-weight: bold; color: #aaa; text-align: center; margin-top: 10px;">DIREZIONE</label>
-            <p style="font-size: 11px; color:#888; text-align:center; margin:0;">↑ Verso bersagli | ↓ Verso piazzola</p>
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: bold; color: #aaa; text-align: center;">DIREZIONE</label>
+                    <p style="font-size: 11px; color:#888; text-align:center; margin:0;">↑ Verso bersagli | ↓ Verso piazzola</p>
 
-            <div class="compass-grid">
-                <button class="dir-btn" data-dir="NW" onclick="selectWindDir('NW')">↖</button>
-                <button class="dir-btn" data-dir="N" onclick="selectWindDir('N')">↑</button>
-                <button class="dir-btn" data-dir="NE" onclick="selectWindDir('NE')">↗</button>
-                <button class="dir-btn" data-dir="W" onclick="selectWindDir('W')">←</button>
-                <button class="dir-btn" data-dir="C" onclick="selectWindDir('C')">C</button>
-                <button class="dir-btn" data-dir="E" onclick="selectWindDir('E')">→</button>
-                <button class="dir-btn" data-dir="SW" onclick="selectWindDir('SW')">↙</button>
-                <button class="dir-btn" data-dir="S" onclick="selectWindDir('S')">↓</button>
-                <button class="dir-btn" data-dir="SE" onclick="selectWindDir('SE')">↘</button>
+                    <div class="compass-grid">
+                        <button class="dir-btn" data-dir="NW" onclick="selectWindDir('NW')">↖</button>
+                        <button class="dir-btn" data-dir="N" onclick="selectWindDir('N')">↑</button>
+                        <button class="dir-btn" data-dir="NE" onclick="selectWindDir('NE')">↗</button>
+                        <button class="dir-btn" data-dir="W" onclick="selectWindDir('W')">←</button>
+                        <button class="dir-btn" data-dir="C" onclick="selectWindDir('C')">C</button>
+                        <button class="dir-btn" data-dir="E" onclick="selectWindDir('E')">→</button>
+                        <button class="dir-btn" data-dir="SW" onclick="selectWindDir('SW')">↙</button>
+                        <button class="dir-btn" data-dir="S" onclick="selectWindDir('S')">↓</button>
+                        <button class="dir-btn" data-dir="SE" onclick="selectWindDir('SE')">↘</button>
+                    </div>
+                </div>
             </div>
 
-            <div class="input-row" style="margin-top: 15px;">
+            <div class="wind-actions" style="margin-top: 8px;">
                 <button class="secondary" onclick="cancelWindModal()">Annulla</button>
                 <button class="accent" onclick="closeWindModal()">Conferma</button>
             </div>
@@ -436,7 +484,6 @@
         // --- GESTIONE VENTO ---
         function openWindModal() {
             windModalInitial = { ...state.currentWind };
-            document.getElementById('wind-intensity').value = state.currentWind.int;
             updateWindUI(state.currentWind.dir);
             openModal('wind-modal');
         }
@@ -459,22 +506,35 @@
             state.currentWind.dir = dir;
             if (dir === 'C') {
                 state.currentWind.int = 0;
-                document.getElementById('wind-intensity').value = 0;
             } else if (state.currentWind.int === 0) {
                 state.currentWind.int = 1;
-                document.getElementById('wind-intensity').value = 1;
             }
+            updateWindUI();
+        }
+
+        function selectWindIntensity(level) {
+            state.currentWind.int = level;
+            if (level === 0) state.currentWind.dir = 'C';
+            if (level > 0 && state.currentWind.dir === 'C') state.currentWind.dir = 'N';
             updateWindUI();
         }
 
         function updateWindUI(forceDir) {
             if (forceDir) state.currentWind.dir = forceDir;
-            state.currentWind.int = parseInt(document.getElementById('wind-intensity').value, 10);
 
             if (state.currentWind.int === 0) state.currentWind.dir = 'C';
             if (state.currentWind.int > 0 && state.currentWind.dir === 'C') state.currentWind.dir = 'N';
 
-            document.getElementById('wind-intensity-val').textContent = `${state.currentWind.int} ` + (state.currentWind.int === 0 ? '(Calma)' : '');
+            document.querySelectorAll('.wind-level').forEach(level => {
+                level.classList.toggle('active', parseInt(level.dataset.level, 10) === state.currentWind.int);
+            });
+            const flag = document.getElementById('wind-flag');
+            const cloth = flag ? flag.querySelector('.flag-cloth') : null;
+            if (flag) flag.style.bottom = `${(state.currentWind.int / 5) * 100}%`;
+            if (cloth) {
+                const clothAngles = [90, 75, 60, 45, 25, 0];
+                cloth.style.transform = `rotate(${clothAngles[state.currentWind.int]}deg)`;
+            }
             document.querySelectorAll('.dir-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.dir === state.currentWind.dir);
             });
