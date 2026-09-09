@@ -99,6 +99,7 @@
         .bottom-bar { display: flex; gap: 10px; margin-top: auto; padding-top: 20px; }
         .btn-huge { font-size: 18px; padding: 15px; flex: 2; text-transform: uppercase; letter-spacing: 1px; }
         .btn-storico { flex: 1; background-color: #444; }
+        .history-athlete-btn { width: 36px; height: 36px; min-width: 36px; flex: 0 0 36px; padding: 0; border-radius: 50%; font-size: 20px; line-height: 1; }
 
         /* Modulo Vento */
         .compass-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 180px; margin: 15px auto; aspect-ratio: 1; }
@@ -722,7 +723,10 @@
                 const name = document.createElement('span');
                 name.textContent = athleteName;
                 const button = document.createElement('button');
-                button.textContent = 'Vedi Serie';
+                button.className = 'history-athlete-btn';
+                button.textContent = '→';
+                button.title = 'Vedi serie';
+                button.setAttribute('aria-label', `Vedi serie di ${athleteName}`);
                 button.addEventListener('click', () => showAthleteHistory(id, athleteName));
 
                 li.append(name, button);
