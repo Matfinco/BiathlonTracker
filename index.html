@@ -84,6 +84,9 @@
         .stepper-value { font-size: 32px; font-weight: bold; min-width: 80px; text-align: center; }
 
         .hidden { display: none !important; }
+
+        body.theme-shot-white .shot { background-color: #ffffff !important; color: #000000 !important; border: 2px solid #000 !important; }
+        body.theme-shot-black .shot { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #fff !important; }
     </style>
 </head>
 <body>
@@ -103,6 +106,11 @@
     <div class="controls" id="normal-controls-1">
         <select id="athlete-select"></select>
         <button id="btn-position" class="secondary" onclick="togglePosition()">Pos: T</button>
+        <select id="shot-color-select" class="secondary">
+            <option value="color">🎨 Colori</option>
+            <option value="white">⚪ Bianchi</option>
+            <option value="black">⚫ Neri</option>
+        </select>
         <select id="mode-select" class="secondary">
             <option value="Azzeramento">🔧 Azzeramento</option>
             <option value="Gara">🏁 Gara</option>
@@ -238,7 +246,7 @@
         let state = {
             coachName: "", cloudUrl: "", roster: [ { id: 1, name: "Atleta di Test" } ],
             activeAthletes: [ { id: 1, name: "Atleta di Test", seriesT: 1, seriesP: 1 } ],
-            currentAthleteId: 1, currentPos: 'T', currentMode: 'Allenamento', 
+            currentAthleteId: 1, currentPos: 'T', currentMode: 'Allenamento', shotColor: 'color',
             currentShots: [], history: [], syncQueue: [], deleteQueue: [], reviewMode: null 
         };
 
@@ -257,6 +265,12 @@
             // Ripristina i valori nei campi di input
             document.getElementById('coach-name').value = state.coachName;
             document.getElementById('sheet-url').value = state.cloudUrl;
+
+            document.getElementById('shot-color-select').addEventListener('change', (e) => {
+                state.shotColor = e.target.value;
+                saveState();
+                applyShotColorTheme();
+            });
             
             // FASE 1: Salvataggio istantaneo in memoria. Nessun dato andrà più perso
             // se chiudi l'app mentre stai digitando.
@@ -303,6 +317,7 @@
                     if (p.activeAthletes) { state.activeAthletes = p.activeAthletes; }
                     state.currentAthleteId = p.currentAthleteId; state.currentPos = p.currentPos || 'T'; 
                     state.currentMode = p.currentMode || 'Allenamento';
+                    state.shotColor = p.shotColor || 'color';
                     state.currentShots = p.currentShots || []; state.history = p.history || []; 
                     state.syncQueue = p.syncQueue || []; state.deleteQueue = p.deleteQueue || [];
                     if(!state.roster.length) forceDefaultAthlete();
@@ -345,7 +360,7 @@
                 saveState(); 
             };
 
-            updateHeader(); renderShotsFromState(); toggleReviewUI(); updateSyncBadge();
+            updateHeader(); renderShotsFromState(); toggleReviewUI(); applyShotColorTheme(); updateSyncBadge();
         }
 
         function updateHeader() {
@@ -364,6 +379,13 @@
             const seriesNum = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
             badgeEl.textContent = `${seriesNum}${state.currentPos} ✏️`;
             document.getElementById('btn-position').textContent = `Pos: ${state.currentPos}`;
+        }
+
+        function applyShotColorTheme() {
+            document.body.classList.remove('theme-shot-white', 'theme-shot-black');
+            if (state.shotColor === 'white') document.body.classList.add('theme-shot-white');
+            if (state.shotColor === 'black') document.body.classList.add('theme-shot-black');
+            document.getElementById('shot-color-select').value = state.shotColor;
         }
 
         function openSeriesModal() {
