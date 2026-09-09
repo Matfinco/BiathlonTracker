@@ -277,7 +277,7 @@
     </div>
 
     <!-- Modale Vento -->
-    <div class="modal-overlay" id="wind-modal">
+    <div class="modal-overlay" id="wind-modal" onclick="if(event.target === this) cancelWindModal()">
         <div class="modal">
             <h3>🌬️ Condizioni Vento</h3>
 
@@ -302,6 +302,7 @@
             </div>
 
             <div class="input-row" style="margin-top: 15px;">
+                <button class="secondary" onclick="cancelWindModal()">Annulla</button>
                 <button class="accent" onclick="closeWindModal()">Conferma</button>
             </div>
         </div>
@@ -314,11 +315,11 @@
         let state = {
             coachName: "", cloudUrl: "", lookerUrl: "", roster: [ { id: 1, name: "Atleta di Test" } ],
             activeAthletes: [ { id: 1, name: "Atleta di Test", seriesT: 1, seriesP: 1 } ],
-            currentAthleteId: 1, currentPos: 'T', currentMode: 'Allenamento', shotColor: 'color',
+            currentAthleteId: 1, currentPos: 'T', currentMode: 'Allenamento', shotColor: 'color', currentWind: { dir: 'C', int: 0 },
             currentShots: [], history: [], syncQueue: [], deleteQueue: [], reviewMode: null 
         };
 
-        let modalSelectedPos = 'T'; let modalSeriesValues = { T: 1, P: 1 };
+        let modalSelectedPos = 'T'; let modalSeriesValues = { T: 1, P: 1 }; let windModalInitial = null;
         const targetEl = document.getElementById('target-box');
         const athleteSelect = document.getElementById('athlete-select');
         const slider = document.getElementById('time-slider');
@@ -382,6 +383,66 @@
             window.open(state.lookerUrl, '_blank');
         }
 
+        // --- GESTIONE VENTO ---
+        function openWindModal() {
+            windModalInitial = { ...state.currentWind };
+            document.getElementById('wind-intensity').value = state.currentWind.int;
+            updateWindUI(state.currentWind.dir);
+            openModal('wind-modal');
+        }
+
+        function closeWindModal() {
+            saveState();
+            updateWindBadge();
+            windModalInitial = null;
+            closeModal('wind-modal');
+        }
+
+        function cancelWindModal() {
+            if (windModalInitial) state.currentWind = { ...windModalInitial };
+            updateWindBadge();
+            windModalInitial = null;
+            closeModal('wind-modal');
+        }
+
+        function selectWindDir(dir) {
+            state.currentWind.dir = dir;
+            if (dir === 'C') {
+                state.currentWind.int = 0;
+                document.getElementById('wind-intensity').value = 0;
+            } else if (state.currentWind.int === 0) {
+                state.currentWind.int = 1;
+                document.getElementById('wind-intensity').value = 1;
+            }
+            updateWindUI();
+        }
+
+        function updateWindUI(forceDir) {
+            if (forceDir) state.currentWind.dir = forceDir;
+            state.currentWind.int = parseInt(document.getElementById('wind-intensity').value, 10);
+
+            if (state.currentWind.int === 0) state.currentWind.dir = 'C';
+            if (state.currentWind.int > 0 && state.currentWind.dir === 'C') state.currentWind.dir = 'N';
+
+            document.getElementById('wind-intensity-val').textContent = `${state.currentWind.int} ` + (state.currentWind.int === 0 ? '(Calma)' : '');
+            document.querySelectorAll('.dir-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.dir === state.currentWind.dir);
+            });
+        }
+
+        function updateWindBadge() {
+            const btn = document.getElementById('btn-wind');
+            if (!btn) return;
+            if (state.currentWind.int === 0) {
+                btn.textContent = '🚩 Vento';
+                btn.className = 'secondary';
+            } else {
+                const arrows = { N: '↑', NE: '↗', E: '→', SE: '↘', S: '↓', SW: '↙', W: '←', NW: '↖' };
+                btn.textContent = `🚩 ${arrows[state.currentWind.dir]} ${state.currentWind.int}`;
+                btn.className = 'accent';
+            }
+        }
+
         function saveState() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
             updateSyncBadge(); if(!state.reviewMode) updateSliderMax();
@@ -398,6 +459,7 @@
                     if (p.activeAthletes) { state.activeAthletes = p.activeAthletes; }
                     state.currentAthleteId = p.currentAthleteId; state.currentPos = p.currentPos || 'T'; 
                     state.currentMode = p.currentMode || 'Allenamento';
+                    state.currentWind = p.currentWind || { dir: 'C', int: 0 };
                     state.shotColor = p.shotColor || 'color';
                     state.currentShots = p.currentShots || []; state.history = p.history || []; 
                     state.syncQueue = p.syncQueue || []; state.deleteQueue = p.deleteQueue || [];
@@ -441,7 +503,7 @@
                 saveState(); 
             };
 
-            updateHeader(); renderShotsFromState(); toggleReviewUI(); applyShotColorTheme(); updateSyncBadge();
+            updateHeader(); renderShotsFromState(); toggleReviewUI(); applyShotColorTheme(); updateWindBadge(); updateSyncBadge();
         }
 
         function updateHeader() {
@@ -853,12 +915,14 @@
 
             const dataPacket = {
                 id: uniqueId, type: state.currentMode, athleteId: athlete.id, athlete: athlete.name, position: state.currentPos,
-                series: seriesLabel, shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: timestampIso
+                series: seriesLabel, windDir: state.currentWind.dir, windInt: state.currentWind.int,
+                shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: timestampIso
             };
             
             const cloudPacket = {
                 id: uniqueId, type: state.currentMode, timestamp: timestampIso, coach: state.coachName || "Non specificato", 
-                athlete: athlete.name, position: state.currentPos, series: seriesLabel, shots: normalizedShots
+                athlete: athlete.name, position: state.currentPos, series: seriesLabel,
+                windDir: state.currentWind.dir, windInt: state.currentWind.int, shots: normalizedShots
             };
 
             state.history.push(dataPacket); state.syncQueue.push(cloudPacket);
