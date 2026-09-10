@@ -385,6 +385,7 @@
     <script>
         const MAX_SHOTS = 8;
         const STORAGE_KEY = 'biathlon_tracker_data_v5';
+        const TRAINING_MODES = ["Azzeramento", "Gara", "L2", "L3", "L4", "Solo Sparo", "Altro"];
 
         let state = {
             coachName: "", cloudUrl: "", lookerUrl: "", roster: [ { id: 1, name: "Atleta di Test" } ],
@@ -583,6 +584,24 @@
             if(!state.activeAthletes.find(a => a.id === state.currentAthleteId)) {
                 if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
             }
+            state.activeAthletes.forEach(ensureSeriesCounters);
+        }
+
+        function ensureSeriesCounters(athlete) {
+            if (!athlete.seriesByMode) athlete.seriesByMode = {};
+            TRAINING_MODES.forEach(mode => {
+                if (!athlete.seriesByMode[mode]) {
+                    athlete.seriesByMode[mode] = {
+                        T: mode === 'Azzeramento' ? (athlete.seriesT || 1) : 1,
+                        P: mode === 'Azzeramento' ? (athlete.seriesP || 1) : 1
+                    };
+                }
+            });
+        }
+
+        function getCurrentSeries(athlete, position = state.currentPos, mode = state.currentMode) {
+            ensureSeriesCounters(athlete);
+            return athlete.seriesByMode[mode]?.[position] || 1;
         }
 
         function forceDefaultAthlete() {
@@ -608,13 +627,14 @@
             const modeSelect = document.getElementById('mode-select');
 
             // Controllo di sicurezza: se in memoria c'è ancora il vecchio "Allenamento", lo passiamo ad "Altro"
-            const validModes = ["Azzeramento", "Gara", "L2", "L3", "L4", "Solo Sparo", "Altro"];
+            const validModes = TRAINING_MODES;
             if (!validModes.includes(state.currentMode)) state.currentMode = "Azzeramento";
 
             modeSelect.value = state.currentMode;
             modeSelect.onchange = (e) => { 
                 state.currentMode = e.target.value; 
-                saveState(); 
+                saveState();
+                updateHeader();
             };
 
             updateHeader(); renderShotsFromState(); toggleReviewUI(); applyShotColorTheme(); updateWindBadge(); updateSyncBadge();
@@ -634,7 +654,7 @@
                 if (nameEl) nameEl.textContent = "Nessuno"; badgeEl.textContent = "-"; return;
             }
             if (nameEl) nameEl.textContent = athlete.name;
-            const seriesNum = state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP;
+            const seriesNum = getCurrentSeries(athlete);
             badgeEl.textContent = `${seriesNum}${state.currentPos} ✏️`;
             document.getElementById('btn-position').textContent = state.currentPos;
         }
@@ -650,8 +670,9 @@
             if(state.reviewMode || state.activeAthletes.length === 0) return;
             const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
             if(!athlete) return;
+            ensureSeriesCounters(athlete);
             modalSelectedPos = state.currentPos;
-            modalSeriesValues = { T: athlete.seriesT, P: athlete.seriesP };
+            modalSeriesValues = { ...athlete.seriesByMode[state.currentMode] };
             document.getElementById('series-modal-desc').textContent = athlete.name;
             updateModalPosUI(); openModal('series-modal');
         }
@@ -667,8 +688,17 @@
         function applySeriesChange() {
             const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
             if(athlete) {
-                athlete.seriesT = modalSeriesValues.T; 
-                athlete.seriesP = modalSeriesValues.P;
+                ensureSeriesCounters(athlete);
+                const selectedSeries = `${modalSeriesValues[modalSelectedPos]}${modalSelectedPos}`;
+                const existingSeries = state.history.find(h =>
+                    h.athleteId === athlete.id &&
+                    h.type === state.currentMode &&
+                    h.position === modalSelectedPos &&
+                    h.series === selectedSeries
+                );
+                if (existingSeries && !confirm(`La serie ${selectedSeries} esiste già. Sovrascriverla?`)) return;
+                if (existingSeries) removeHistoryItemFromState(existingSeries.id);
+                athlete.seriesByMode[state.currentMode] = { ...modalSeriesValues };
                 state.currentPos = modalSelectedPos; 
                 saveState(); 
                 updateHeader();
@@ -899,14 +929,18 @@
             closeModal('history-modal');
         }
         
-        function deleteHistoryItem(id) { 
-            if(!confirm("Eliminare? Questa azione rimuoverà i dati anche dal foglio Google alla prossima sincronizzazione.")) return; 
-            
-            state.deleteQueue.push(id.toString());
-            state.syncQueue = state.syncQueue.filter(q => q.id.toString() !== id.toString());
-            state.history = state.history.filter(h => h.id.toString() !== id.toString()); 
-            
-            saveState(); openHistory(); 
+        function removeHistoryItemFromState(id) {
+            const normalizedId = id.toString();
+            state.syncQueue = state.syncQueue.filter(q => q.id.toString() !== normalizedId);
+            state.history = state.history.filter(h => h.id.toString() !== normalizedId);
+            if (!state.deleteQueue.includes(normalizedId)) state.deleteQueue.push(normalizedId);
+        }
+
+        function deleteHistoryItem(id) {
+            if(!confirm("Eliminare? Questa azione rimuoverà i dati anche dal foglio Google alla prossima sincronizzazione.")) return;
+
+            removeHistoryItemFromState(id);
+            saveState(); openHistory();
         }
         
         function viewHistoryItem(id) { const item = state.history.find(h => h.id.toString() === id.toString()); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
@@ -1022,7 +1056,12 @@
             const visibleCount = parseInt(slider.value); sliderVal.textContent = `${visibleCount} / ${getActiveShots().length}`;
             targetEl.querySelectorAll('.shot').forEach(shotEl => { shotEl.style.display = parseInt(shotEl.dataset.seq) <= visibleCount ? 'flex' : 'none'; });
         }
-        function clearTargetAndState() { state.currentShots = []; saveState(); renderShotsFromState(); }
+        function clearTargetAndState(skipConfirm = false) {
+            if (!skipConfirm && state.currentShots.length > 0 && !confirm("Cancellare tutti i colpi presenti sul bersaglio?")) return;
+            state.currentShots = [];
+            saveState();
+            renderShotsFromState();
+        }
 
         // --- 4. SALVATAGGIO DEI DATI ---
         function saveSeries() {
@@ -1048,7 +1087,7 @@
             });
             const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
             const timestampIso = new Date().toISOString();
-            const seriesLabel = `${state.currentPos === 'T' ? athlete.seriesT : athlete.seriesP}${state.currentPos}`;
+            const seriesLabel = `${getCurrentSeries(athlete)}${state.currentPos}`;
 
             const dataPacket = {
                 id: uniqueId, type: state.currentMode, athleteId: athlete.id, athlete: athlete.name, position: state.currentPos,
@@ -1063,8 +1102,9 @@
             };
 
             state.history.push(dataPacket); state.syncQueue.push(cloudPacket);
-            if (state.currentPos === 'T') athlete.seriesT++; else athlete.seriesP++;
-            clearTargetAndState(); updateHeader();
+            ensureSeriesCounters(athlete);
+            athlete.seriesByMode[state.currentMode][state.currentPos]++;
+            clearTargetAndState(true); updateHeader();
         }
 
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
