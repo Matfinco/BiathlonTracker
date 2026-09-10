@@ -190,6 +190,7 @@
             <option value="L2">📊 L2</option>
             <option value="L3">📊 L3</option>
             <option value="L4">📊 L4</option>
+            <option value="Solo Sparo">🎯 Solo Sparo</option>
             <option value="Altro">📝 Altro</option>
             </select>
         </div>
@@ -604,7 +605,7 @@
             const modeSelect = document.getElementById('mode-select');
 
             // Controllo di sicurezza: se in memoria c'è ancora il vecchio "Allenamento", lo passiamo ad "Altro"
-            const validModes = ["Azzeramento", "Gara", "L2", "L3", "L4", "Altro"];
+            const validModes = ["Azzeramento", "Gara", "L2", "L3", "L4", "Solo Sparo", "Altro"];
             if (!validModes.includes(state.currentMode)) state.currentMode = "Azzeramento";
 
             modeSelect.value = state.currentMode;
