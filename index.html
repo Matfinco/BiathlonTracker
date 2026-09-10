@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.webmanifest">
     <title>Biathlon Tracker</title>
     
     <style>
@@ -450,6 +452,12 @@
         function openModal(id) { document.getElementById(id).style.display = 'flex'; document.body.classList.add('modal-open'); }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; document.body.classList.remove('modal-open'); }
         function getActiveShots() { return state.reviewMode ? state.reviewMode.shots : state.currentShots; }
+
+        function lockPortrait() {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('portrait-primary').catch(() => {});
+            }
+        }
 
         function openDashboard() {
             if (!state.lookerUrl || !state.lookerUrl.startsWith('http')) {
@@ -1108,6 +1116,8 @@
         }
 
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
+        document.addEventListener('pointerdown', lockPortrait, { once: true });
+        lockPortrait();
         init();
     </script>
 </body>
