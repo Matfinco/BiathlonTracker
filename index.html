@@ -117,6 +117,9 @@
         .side-menu { position: absolute; top: 0; right: 0; width: min(82vw, 320px); height: 100%; padding: 72px 18px 18px; box-sizing: border-box; background: #222; box-shadow: -8px 0 24px rgba(0,0,0,0.35); transform: translateX(100%); transition: transform 0.2s ease; }
         .side-menu-overlay.open .side-menu { transform: translateX(0); }
         .side-menu button { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-height: 48px; margin-bottom: 10px; text-align: left; }
+        .side-menu .side-menu-label { display: block; margin: 18px 0 6px; color: #aaa; font-size: 12px; font-weight: bold; }
+        .side-menu select { width: 100%; min-width: 0; margin-bottom: 10px; }
+        #settings-modal .modal { width: min(100%, 560px); max-width: 560px; box-sizing: border-box; }
         .sync-menu-btn { position: relative; }
         .sync-dot { display: none; width: 10px; height: 10px; margin-left: auto; border-radius: 50%; background: #ff3b30; }
         .sync-dot.active { display: block; }
@@ -175,6 +178,11 @@
             <button class="secondary" onclick="openDashboardFromMenu()">📊 Statistiche</button>
             <button class="secondary" onclick="openNewSessionFromMenu()">🔄 Nuova Sessione</button>
             <button id="sync-menu-button" class="secondary sync-menu-btn" onclick="syncFromMenu()">☁️ Sincronizza <span id="sync-dot" class="sync-dot"></span></button>
+            <label class="side-menu-label" for="shot-color-select">COLORE DEI COLPI</label>
+            <select id="shot-color-select" class="secondary">
+                <option value="color">🎨 Colori</option>
+                <option value="white">⚪ Bianchi</option>
+            </select>
         </aside>
     </div>
 
@@ -256,7 +264,7 @@
     </div>
 
     <!-- Modale Impostazioni -->
-    <div class="modal-overlay" id="settings-modal">
+    <div class="modal-overlay" id="settings-modal" onclick="if(event.target === this) closeSettings()">
         <div class="modal">
             <h3>⚙️ Impostazioni App</h3>
             <button class="secondary" onclick="toggleCloudConfig()" style="display: flex; justify-content: space-between; align-items: center;">
@@ -273,18 +281,12 @@
                 <input type="url" id="looker-url" placeholder="https://lookerstudio.google.com/...">
             </div>
 
-            <label style="font-size: 12px; font-weight: bold; color: #aaa;">COLORE DEI COLPI</label>
-            <select id="shot-color-select" class="secondary">
-                <option value="color">🎨 Colori</option>
-                <option value="white">⚪ Bianchi</option>
-            </select>
-
             <h3 style="margin-top: 10px;">Archivio Atleti</h3>
             <div class="input-row">
                 <input type="text" id="new-athlete-name" placeholder="Nuovo atleta...">
                 <button onclick="addAthlete()">Aggiungi</button>
             </div>
-            <ul class="list-container" id="modal-athlete-list" style="max-height: 150px; overflow-y: auto;"></ul>
+            <ul class="list-container" id="modal-athlete-list" style="max-height: 220px; overflow-y: auto;"></ul>
             
             <div class="compact-btns">
                 <button class="secondary" onclick="exportRoster()">📤 Esporta Archivio</button>
@@ -292,7 +294,6 @@
                 <input type="file" id="import-roster-file" accept=".json" style="display: none;" onchange="importRoster(event)">
             </div>
 
-            <h3 style="margin-top: 10px;">Dati e Backup</h3>
             <div class="compact-btns">
                 <button class="danger" onclick="factoryReset()">⚠️ Reset Totale</button>
             </div>
