@@ -90,7 +90,9 @@
         .top-bar { display: flex; align-items: center; gap: 10px; padding: 0; border-bottom: none; margin-bottom: 0; }
         .top-bar .athlete-picker { flex: 1; min-width: 0; }
         .athlete-picker option { font-size: 15px; }
-        .menu-toggle { flex: 0 0 48px !important; width: 48px !important; height: 37px; min-height: 37px; padding: 0 !important; font-size: 25px !important; }
+        .menu-toggle { position: relative; flex: 0 0 48px !important; width: 48px !important; height: 37px; min-height: 37px; padding: 0 !important; font-size: 25px !important; }
+        .hamburger-sync-dot { display: none; position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border: 1px solid #222; border-radius: 50%; background: #ff3b30; }
+        .hamburger-sync-dot.active { display: block; }
         .top-bar button { background: transparent; padding: 5px 10px; min-width: auto; font-size: 14px; border: 1px solid #555; }
         .setup-area { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
         .athlete-picker { font-size: 15px; font-weight: bold; background-color: #2c2c2e; padding: 9px 12px; text-align: center; }
@@ -169,7 +171,7 @@
     <!-- ZONA 1: TOP BAR (SISTEMA) -->
     <div class="top-bar" id="top-bar">
         <select id="athlete-select" class="athlete-picker"></select>
-        <button class="secondary menu-toggle" aria-label="Apri menu" onclick="toggleSideMenu()">☰</button>
+        <button class="secondary menu-toggle" aria-label="Apri menu" onclick="toggleSideMenu()">☰<span id="hamburger-sync-dot" class="hamburger-sync-dot"></span></button>
     </div>
 
     <div class="side-menu-overlay" id="side-menu-overlay" onclick="if(event.target === this) closeSideMenu()">
@@ -703,7 +705,9 @@
             const count = state.syncQueue.length + state.deleteQueue.length;
             const syncBtn = document.getElementById('sync-menu-button');
             const syncDot = document.getElementById('sync-dot');
+            const hamburgerSyncDot = document.getElementById('hamburger-sync-dot');
             if (syncDot) syncDot.classList.toggle('active', count > 0);
+            if (hamburgerSyncDot) hamburgerSyncDot.classList.toggle('active', count > 0);
             if(syncBtn) {
                 if(count > 0) {
                     syncBtn.className = 'secondary sync-menu-btn';
