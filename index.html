@@ -648,18 +648,25 @@
 
         function updateHeader() {
             const badgeEl = document.getElementById('display-series');
-            const nameEl = document.getElementById('display-name');
+            const selectEl = document.getElementById('athlete-select');
             if(state.reviewMode) {
-                if (nameEl) nameEl.textContent = state.reviewMode.athlete;
+                if (selectEl) {
+                    selectEl.innerHTML = '';
+                    const option = document.createElement('option');
+                    option.textContent = state.reviewMode.athlete;
+                    option.selected = true;
+                    selectEl.appendChild(option);
+                    selectEl.disabled = true;
+                }
                 badgeEl.textContent = `Rev. ${state.reviewMode.series}`;
                 badgeEl.style.pointerEvents = 'none'; return;
             }
+            if (selectEl) selectEl.disabled = false;
             badgeEl.style.pointerEvents = 'auto';
             const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
             if(!athlete) {
-                if (nameEl) nameEl.textContent = "Nessuno"; badgeEl.textContent = "-"; return;
+                badgeEl.textContent = "-"; return;
             }
-            if (nameEl) nameEl.textContent = athlete.name;
             const seriesNum = getCurrentSeries(athlete);
             badgeEl.textContent = `${seriesNum}${state.currentPos} ✏️`;
             document.getElementById('btn-position').textContent = state.currentPos;
