@@ -293,9 +293,7 @@
             <ul class="list-container" id="modal-athlete-list" style="max-height: 220px; overflow-y: auto;"></ul>
             
             <div class="compact-btns">
-                <button class="secondary" onclick="exportRoster()">📤 Esporta Archivio</button>
-                <button class="secondary" onclick="document.getElementById('import-roster-file').click()">📥 Importa</button>
-                <input type="file" id="import-roster-file" accept=".json" style="display: none;" onchange="importRoster(event)">
+                <button class="accent" onclick="pullRosterFromCloud()">🔄 Sincronizza con Foglio</button>
             </div>
 
             <div class="compact-btns">
@@ -454,8 +452,8 @@
         function getActiveShots() { return state.reviewMode ? state.reviewMode.shots : state.currentShots; }
 
         function lockPortrait() {
-            if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('portrait-primary').catch(() => {});
+            if (window.screen && window.screen.orientation && typeof window.screen.orientation.lock === 'function') {
+                window.screen.orientation.lock('portrait-primary').catch(() => {});
             }
         }
 
@@ -816,50 +814,43 @@
         }
         function addAthlete() { const input = document.getElementById('new-athlete-name'); const name = input.value.trim(); if(!name) return; state.roster.push({ id: Date.now(), name: name }); input.value = ''; saveState(); renderRosterList(); }
         function removeAthlete(id) { if(!confirm("Rimuovere definitivamente?")) return; state.roster = state.roster.filter(a => a.id !== id); state.activeAthletes = state.activeAthletes.filter(a => a.id !== id); saveState(); renderRosterList(); refreshInterface(); }
-        // --- ESPORTAZIONE ARCHIVIO ATLETI ---
-        function exportRoster() {
-            if (state.roster.length === 0) return alert("Nessun atleta in archivio da esportare.");
-            
-            // Converte l'array in una stringa JSON formattata in modo leggibile
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.roster, null, 2));
-            
-            // Crea un link invisibile, gli aggancia il file e lo "clicca" automaticamente
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "archivio_atleti_biathlon.json");
-            document.body.appendChild(downloadAnchorNode); 
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
+
+        async function pullRosterFromCloud() {
+            if (!state.cloudUrl || !state.cloudUrl.startsWith('http')) {
+                return alert("Devi prima inserire l'URL dello script Google nelle impostazioni.");
+            }
+            if (state.roster.length > 0 && !confirm("Questo sovrascriverà la lista locale con quella presente nel foglio Google. Continuare?")) return;
+
+            try {
+                const response = await fetch(state.cloudUrl, { cache: 'no-store' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (data.status !== "success" || !Array.isArray(data.roster) || data.roster.length === 0) {
+                    return alert("Errore: " + (data.error || "Nessun atleta trovato nel tab Anagrafica."));
+                }
+
+                const previousAthletes = new Map(state.activeAthletes.map(a => [String(a.id), a]));
+                state.roster = data.roster
+                    .filter(a => a && a.name)
+                    .map(a => ({ id: a.id, name: a.name.toString().trim() }))
+                    .filter(a => a.name);
+                if (state.roster.length === 0) return alert("Errore: il roster ricevuto non contiene nomi validi.");
+                state.activeAthletes = state.roster.map(a => {
+                    const previous = previousAthletes.get(String(a.id));
+                    return previous ? { ...previous, id: a.id, name: a.name } : { id: a.id, name: a.name, seriesT: 1, seriesP: 1 };
+                });
+                state.activeAthletes.forEach(ensureSeriesCounters);
+                if (!state.activeAthletes.some(a => a.id === state.currentAthleteId)) state.currentAthleteId = state.activeAthletes[0].id;
+
+                saveState();
+                renderRosterList();
+                refreshInterface();
+                alert(`Archivio aggiornato: caricati ${state.roster.length} atleti!`);
+            } catch (err) {
+                alert("Impossibile contattare il server. Verifica la connessione, il deploy doGet e l'URL.");
+            }
         }
 
-        // --- IMPORTAZIONE ARCHIVIO ATLETI ---
-        function importRoster(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                try {
-                    const importedRoster = JSON.parse(event.target.result);
-                    
-                    // Controllo base di sicurezza: verifica che sia un array
-                    if (Array.isArray(importedRoster)) {
-                        state.roster = importedRoster;
-                        saveState();
-                        renderRosterList();
-                        refreshInterface();
-                        alert("Archivio atleti importato con successo!");
-                    } else {
-                        alert("Errore: Il file non contiene una lista valida di atleti.");
-                    }
-                } catch (err) {
-                    alert("Errore critico nella lettura del file JSON.");
-                }
-                // Svuota l'input file per permettere di ricaricare lo stesso file se si sbaglia
-                e.target.value = ''; 
-            };
-            reader.readAsText(file);
-        }
         function factoryReset() { if(!confirm("ATTENZIONE: Reset totale?")) return; localStorage.removeItem(STORAGE_KEY); location.reload(); }
 
         // --- NUOVO STORICO A IMBUTO ---
@@ -1083,7 +1074,7 @@
                 const nx = Math.round(s.x * scaleX);
                 const ny = Math.round(s.y * scaleY);
                 const dist = Math.round(Math.sqrt(Math.pow(nx - 200, 2) + Math.pow(ny - 220, 2)));
-                const threshold = state.currentPos === 'T' ? 70 : 180;
+                const threshold = state.currentPos === 'T' ? 70.4 : 180;
                 
                 return { 
                     seq: s.seq, 
