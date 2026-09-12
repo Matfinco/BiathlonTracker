@@ -1161,7 +1161,19 @@
         }
 
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
-        window.addEventListener('online', silentAutoSync);
+        
+        // 1. Ritardo di 3 secondi quando torna il Wi-Fi per far stabilizzare la rete
+        window.addEventListener('online', () => {
+            setTimeout(silentAutoSync, 3000);
+        });
+
+        // 2. Sincronizza in automatico quando riapri l'app o sblocchi lo schermo del tablet
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                silentAutoSync();
+            }
+        });        
+        
         document.addEventListener('pointerdown', lockPortrait, { once: true });
         lockPortrait();
         init();
