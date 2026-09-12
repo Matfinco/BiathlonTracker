@@ -989,10 +989,14 @@
         }
 
         function deleteHistoryItem(id) {
-            if(!confirm("Eliminare? Questa azione rimuoverà i dati anche dal foglio Google alla prossima sincronizzazione.")) return;
+            if(!confirm("Eliminare? Questa azione rimuoverà i dati anche dal foglio Google in questo momento.")) return;
 
             removeHistoryItemFromState(id);
-            saveState(); openHistory();
+            saveState(); 
+            openHistory();
+            
+            // Innesca l'eliminazione sul cloud in background
+            silentAutoSync(); 
         }
         
         function viewHistoryItem(id) { const item = state.history.find(h => h.id.toString() === id.toString()); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
