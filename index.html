@@ -1002,21 +1002,42 @@
         function viewHistoryItem(id) { const item = state.history.find(h => h.id.toString() === id.toString()); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
         function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
 
-        // --- 1. RIPRISTINATO L'ASCOLTATORE DEL TOCCO (Mancava!) ---
+        let tapStartTime = 0;
+        let tapStartCoords = { x: 0, y: 0 };
+        let potentialTap = false;
+
+        // --- 1. FRONTE DI SALITA (Pointer Down) ---
         targetEl.addEventListener('pointerdown', (e) => {
             if(state.reviewMode || state.activeAthletes.length === 0) return; 
             if (parseInt(slider.value) < state.currentShots.length) { slider.value = state.currentShots.length; updateVisualsFromSlider(); }
+            
+            tapStartTime = Date.now();
+            tapStartCoords = { x: e.clientX, y: e.clientY };
+            potentialTap = true; // Assumiamo sia un tap valido fino a prova contraria
+
             if (e.target.classList.contains('shot')) {
+                potentialTap = false; // Se tocco un colpo, annullo l'inserimento
                 const shotNode = e.target;
-                longPressTimer = setTimeout(() => { isDragging = true; draggedShot = shotNode; shotNode.classList.add('dragging'); targetEl.setPointerCapture(e.pointerId); if (navigator.vibrate) navigator.vibrate(50); }, 800);
-            } else if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
-                if (state.currentShots.length >= MAX_SHOTS) return;
-                const rect = targetEl.getBoundingClientRect(); createShot(e.clientX - rect.left, e.clientY - rect.top);
+                
+                // Timer impostato a 500ms (0.5 secondi) come richiesto per il trascinamento
+                longPressTimer = setTimeout(() => { 
+                    isDragging = true; 
+                    draggedShot = shotNode; 
+                    shotNode.classList.add('dragging'); 
+                    targetEl.setPointerCapture(e.pointerId); 
+                    if (navigator.vibrate) navigator.vibrate(50); 
+                }, 500);
             }
         });
 
-        // --- 2. LOGICA DI TRASCINAMENTO E COLORE DINAMICO ---
+        // --- 2. MOVIMENTO E LOGICA DI TRASCINAMENTO ---
         targetEl.addEventListener('pointermove', (e) => {
+            // Se il dito striscia per più di 10 pixel, annulliamo l'inserimento (tocco accidentale)
+            if (potentialTap) {
+                const dist = Math.sqrt(Math.pow(e.clientX - tapStartCoords.x, 2) + Math.pow(e.clientY - tapStartCoords.y, 2));
+                if (dist > 10) potentialTap = false;
+            }
+
             if (isDragging && draggedShot && !state.reviewMode) {
                 const rect = targetEl.getBoundingClientRect();
                 let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width)); 
@@ -1027,7 +1048,6 @@
                 state.currentShots[seqIndex].x = x; 
                 state.currentShots[seqIndex].y = y;
 
-                // Cambio colore dinamico durante il trascinamento
                 const isHit = evaluateShot(x, y, targetEl.offsetWidth, targetEl.offsetHeight, state.currentPos);
                 if(isHit) {
                     draggedShot.classList.replace('miss', 'hit') || draggedShot.classList.add('hit');
@@ -1038,18 +1058,37 @@
             }
         });
 
+        // --- 3. FRONTE DI DISCESA (Pointer Up) ---
         const handlePointerUp = (e) => {
+            const elapsedTime = Date.now() - tapStartTime;
+
             if (longPressTimer) {
-                clearTimeout(longPressTimer); longPressTimer = null;
-                if (e.target.classList.contains('shot')) {
+                clearTimeout(longPressTimer); 
+                longPressTimer = null;
+            }
+
+            if (isDragging && draggedShot) {
+                // Rilascio di un colpo trascinato
+                draggedShot.classList.remove('dragging'); 
+                targetEl.releasePointerCapture(e.pointerId); 
+                draggedShot = null; 
+                isDragging = false; 
+                saveState(); 
+            } else if (potentialTap && elapsedTime <= 500) {
+                // È un tap valido: fronte di discesa entro 0.5s, senza strisciare, in un'area libera
+                if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
                     if (state.currentShots.length >= MAX_SHOTS) return;
-                    const rect = targetEl.getBoundingClientRect(); createShot(e.clientX - rect.left, e.clientY - rect.top);
+                    const rect = targetEl.getBoundingClientRect(); 
+                    createShot(e.clientX - rect.left, e.clientY - rect.top);
                 }
             }
-            if (isDragging && draggedShot) { draggedShot.classList.remove('dragging'); targetEl.releasePointerCapture(e.pointerId); draggedShot = null; isDragging = false; saveState(); }
+            
+            potentialTap = false;
         };
 
-        targetEl.addEventListener('pointerup', handlePointerUp); targetEl.addEventListener('pointercancel', handlePointerUp); 
+        targetEl.addEventListener('pointerup', handlePointerUp); 
+        targetEl.addEventListener('pointercancel', handlePointerUp);
+
         function undoLastShot() { if (state.reviewMode || state.currentShots.length === 0) return; state.currentShots.pop(); saveState(); renderShotsFromState(); }
 
         // --- 3. CREAZIONE E RENDERING PULITI ---
