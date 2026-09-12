@@ -400,7 +400,7 @@
         const slider = document.getElementById('time-slider');
         const sliderVal = document.getElementById('slider-val');
         
-        let draggedShot = null; let isDragging = false; let longPressTimer = null;
+        let draggedShot = null; let isDragging = false; let longPressTimer = null; let silentSyncInProgress = false;
 
         function init() {
             loadState(); 
@@ -436,6 +436,20 @@
             document.querySelectorAll('.modal-overlay').forEach(overlay => {
                 overlay.addEventListener('touchmove', (e) => { if(e.target === overlay) e.preventDefault(); }, { passive: false });
             });
+
+            checkStaleSession();
+        }
+
+        function checkStaleSession() {
+            if (!state.history || state.history.length === 0) return;
+
+            const lastSeries = state.history[state.history.length - 1];
+            const lastTime = new Date(lastSeries.timestamp).getTime();
+            const threeHours = 3 * 60 * 60 * 1000;
+
+            if (Number.isFinite(lastTime) && Date.now() - lastTime > threeHours && confirm("Sono passate più di 3 ore dall'ultimo salvataggio.\n\nVuoi avviare una Nuova Sessione azzerando i contatori?")) {
+                openNewSessionModal();
+            }
         }
 
         // Calcola la distanza e valuta l'esito
@@ -788,6 +802,38 @@
             }
         }
 
+        async function silentAutoSync() {
+            if (silentSyncInProgress || state.syncQueue.length === 0 && state.deleteQueue.length === 0) return;
+            if (!navigator.onLine || !state.cloudUrl || !state.cloudUrl.startsWith('http') || !state.coachName) return;
+
+            silentSyncInProgress = true;
+            const inserts = [...state.syncQueue];
+            const deletes = [...state.deleteQueue];
+            const payload = { inserts, deletes };
+
+            try {
+                const response = await fetch(state.cloudUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.status === "success") {
+                    const insertedIds = new Set(inserts.map(item => item.id.toString()));
+                    const deletedIds = new Set(deletes.map(id => id.toString()));
+                    state.syncQueue = state.syncQueue.filter(item => !insertedIds.has(item.id.toString()));
+                    state.deleteQueue = state.deleteQueue.filter(id => !deletedIds.has(id.toString()));
+                    saveState();
+                    updateSyncBadge();
+                }
+            } catch (err) {
+                // Lascia le code intatte: il prossimo evento online o il comando manuale riprovera.
+            } finally {
+                silentSyncInProgress = false;
+            }
+        }
+
         function openNewSessionModal() { 
             const list = document.getElementById('session-checklist'); list.innerHTML = '';
             state.roster.forEach(athlete => {
@@ -1111,9 +1157,11 @@
             ensureSeriesCounters(athlete);
             athlete.seriesByMode[state.currentMode][state.currentPos]++;
             clearTargetAndState(true); updateHeader();
+            silentAutoSync();
         }
 
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
+        window.addEventListener('online', silentAutoSync);
         document.addEventListener('pointerdown', lockPortrait, { once: true });
         lockPortrait();
         init();
