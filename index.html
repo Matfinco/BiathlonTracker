@@ -387,12 +387,94 @@
         const STORAGE_KEY = 'biathlon_tracker_data_v5';
         const TRAINING_MODES = ["Azzeramento", "Gara", "L2", "L3", "L4", "Solo Sparo", "Altro"];
 
+        // --- DATABASE OFFLINE (IndexedDB) ---
+        const idb = {
+            dbName: 'BiathlonTrackerDB',
+            version: 1,
+            storeName: 'appState',
+            
+            async getDb() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onupgradeneeded = (e) => {
+                        e.target.result.createObjectStore(this.storeName);
+                    };
+                });
+            },
+            async get(key) {
+                const db = await this.getDb();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(this.storeName, 'readonly');
+                    const request = tx.objectStore(this.storeName).get(key);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            },
+            async set(key, value) {
+                const db = await this.getDb();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(this.storeName, 'readwrite');
+                    const request = tx.objectStore(this.storeName).put(value, key);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+        };
+
         let state = {
             coachName: "", cloudUrl: "", lookerUrl: "", roster: [ { id: 1, name: "Atleta di Test" } ],
             activeAthletes: [ { id: 1, name: "Atleta di Test", seriesT: 1, seriesP: 1 } ],
             currentAthleteId: 1, currentPos: 'T', currentMode: 'Allenamento', shotColor: 'color', currentWind: { dir: 'C', int: 0 },
-            currentShots: [], history: [], syncQueue: [], deleteQueue: [], reviewMode: null 
+            currentShots: [], history: [], syncQueue: [], deleteQueue: [], reviewMode: null,
+            sessionTimestamp: Date.now() // Nuova variabile per il controllo assoluto del tempo
         };
+
+        // loadState diventa asincrono
+        async function loadState() {
+            try {
+                let p = await idb.get('main_state');
+                
+                // MIGRATION: Se IDB è vuoto, recupera i vecchi dati da localStorage
+                if (!p) {
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (saved) {
+                        p = JSON.parse(saved);
+                        console.log("Migrazione da localStorage a IndexedDB completata.");
+                    }
+                }
+
+                if (p) {
+                    state.coachName = p.coachName || ""; 
+                    state.cloudUrl = p.cloudUrl || "";
+                    state.lookerUrl = p.lookerUrl || "";
+                    if (p.roster) state.roster = p.roster;
+                    if (p.activeAthletes) state.activeAthletes = p.activeAthletes;
+                    state.currentAthleteId = p.currentAthleteId; 
+                    state.currentPos = p.currentPos || 'T'; 
+                    state.currentMode = p.currentMode || 'Allenamento';
+                    state.currentWind = p.currentWind || { dir: 'C', int: 0 };
+                    state.shotColor = p.shotColor === 'white' ? 'white' : 'color';
+                    state.currentShots = p.currentShots || []; 
+                    state.history = p.history || []; 
+                    state.syncQueue = p.syncQueue || []; 
+                    state.deleteQueue = p.deleteQueue || [];
+                    state.sessionTimestamp = p.sessionTimestamp || Date.now();
+                } else {
+                    forceDefaultAthlete();
+                }
+            } catch (e) {
+                console.error("Errore caricamento stato:", e);
+                forceDefaultAthlete();
+            }
+
+            // Controlli di integrità post-caricamento
+            if(!state.activeAthletes.find(a => a.id === state.currentAthleteId)) {
+                if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
+            }
+            state.activeAthletes.forEach(ensureSeriesCounters);
+        }
 
         let modalSelectedPos = 'T'; let modalSeriesValues = { T: 1, P: 1 }; let windModalInitial = null;
         const targetEl = document.getElementById('target-box');
@@ -402,11 +484,10 @@
         
         let draggedShot = null; let isDragging = false; let longPressTimer = null; let silentSyncInProgress = false;
 
-        function init() {
-            loadState(); 
+        async function init() {
+            await loadState(); // Adesso aspettiamo che il DB risponda
             refreshInterface();
             
-            // Ripristina i valori nei campi di input
             document.getElementById('coach-name').value = state.coachName;
             document.getElementById('sheet-url').value = state.cloudUrl;
             document.getElementById('looker-url').value = state.lookerUrl;
@@ -417,8 +498,6 @@
                 applyShotColorTheme();
             });
             
-            // FASE 1: Salvataggio istantaneo in memoria. Nessun dato andrà più perso
-            // se chiudi l'app mentre stai digitando.
             document.getElementById('coach-name').addEventListener('input', (e) => {
                 state.coachName = e.target.value.trim();
                 saveState();
@@ -440,18 +519,20 @@
             checkStaleSession();
         }
 
-        function checkStaleSession() {
-            if (!state.history || state.history.length === 0) return;
 
-            const lastSeries = state.history[state.history.length - 1];
-            const lastTime = new Date(lastSeries.timestamp).getTime();
+        function checkStaleSession() {
             const threeHours = 3 * 60 * 60 * 1000;
 
-            if (Number.isFinite(lastTime) && Date.now() - lastTime > threeHours && confirm("Sono passate più di 3 ore dall'ultimo salvataggio.\n\nVuoi avviare una Nuova Sessione azzerando i contatori?")) {
-                openNewSessionModal();
+            if (Date.now() - state.sessionTimestamp > threeHours) {
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        if (confirm("Sono passate più di 3 ore dall'ultima attività.\n\nVuoi avviare una Nuova Sessione azzerando i contatori?")) {
+                            openNewSessionModal();
+                        }
+                    }, 150); 
+                });
             }
         }
-
         // Calcola la distanza e valuta l'esito
         function evaluateShot(x, y, bx, by, pos) {
             const normX = (x / bx) * 400;
@@ -578,33 +659,11 @@
             }
         }
 
+        // Aggiorniamo saveState per usare IndexedDB (fire-and-forget asincrono)
         function saveState() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            updateSyncBadge(); if(!state.reviewMode) updateSliderMax();
-        }
-
-        function loadState() {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                try {
-                    const p = JSON.parse(saved);
-                    state.coachName = p.coachName || ""; state.cloudUrl = p.cloudUrl || "";
-                    state.lookerUrl = p.lookerUrl || "";
-                    if (p.roster) { state.roster = p.roster; }
-                    if (p.activeAthletes) { state.activeAthletes = p.activeAthletes; }
-                    state.currentAthleteId = p.currentAthleteId; state.currentPos = p.currentPos || 'T'; 
-                    state.currentMode = p.currentMode || 'Allenamento';
-                    state.currentWind = p.currentWind || { dir: 'C', int: 0 };
-                    state.shotColor = p.shotColor === 'white' ? 'white' : 'color';
-                    state.currentShots = p.currentShots || []; state.history = p.history || []; 
-                    state.syncQueue = p.syncQueue || []; state.deleteQueue = p.deleteQueue || [];
-                    if(!state.roster.length) forceDefaultAthlete();
-                } catch (e) { forceDefaultAthlete(); }
-            } else { forceDefaultAthlete(); }
-            if(!state.activeAthletes.find(a => a.id === state.currentAthleteId)) {
-                if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
-            }
-            state.activeAthletes.forEach(ensureSeriesCounters);
+            idb.set('main_state', state).catch(err => console.error("Errore salvataggio IDB:", err));
+            updateSyncBadge(); 
+            if(!state.reviewMode) updateSliderMax();
         }
 
         function ensureSeriesCounters(athlete) {
@@ -845,6 +904,7 @@
             openModal('new-session-modal');
         }
         function closeNewSessionModal() { closeModal('new-session-modal'); }
+        
         function startNewSession() {
             if(state.currentShots.length > 0 && !confirm("Hai colpi non salvati sul bersaglio. Procedere comunque?")) return;
             const checkboxes = document.querySelectorAll('#session-checklist input[type="checkbox"]:checked');
@@ -852,7 +912,57 @@
             state.history = []; state.currentShots = []; state.reviewMode = null; state.currentMode = 'Allenamento';
             state.activeAthletes = state.roster.filter(a => selectedIds.includes(a.id)).map(a => ({ id: a.id, name: a.name, seriesT: 1, seriesP: 1 }));
             if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
+            
+            state.sessionTimestamp = Date.now(); // Resetta il timer
+            
             saveState(); refreshInterface(); closeNewSessionModal();
+        }
+
+        function saveSeries() {
+            if(state.activeAthletes.length === 0) return alert("Nessun atleta selezionato.");
+            if (state.currentShots.length === 0) return alert("Nessun colpo.");
+            
+            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
+            const exportW = 400; const exportH = 440;
+            const normalizedShots = state.currentShots.map(s => {
+                const scaleX = s.bx ? (exportW / s.bx) : 1; const scaleY = s.by ? (exportH / s.by) : 1;
+                const nx = Math.round(s.x * scaleX);
+                const ny = Math.round(s.y * scaleY);
+                const dist = Math.round(Math.sqrt(Math.pow(nx - 200, 2) + Math.pow(ny - 220, 2)));
+                const threshold = state.currentPos === 'T' ? 70.4 : 180;
+                
+                return { 
+                    seq: s.seq, 
+                    x: nx, 
+                    y: ny, 
+                    distanza: dist, 
+                    esito: (dist <= threshold) ? 'Bersaglio' : 'Errore' 
+                };
+            });
+            const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+            const timestampIso = new Date().toISOString();
+            const seriesLabel = `${getCurrentSeries(athlete)}${state.currentPos}`;
+
+            const dataPacket = {
+                id: uniqueId, type: state.currentMode, athleteId: athlete.id, athlete: athlete.name, position: state.currentPos,
+                series: seriesLabel, windDir: state.currentWind.dir, windInt: state.currentWind.int,
+                shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: timestampIso
+            };
+            
+            const cloudPacket = {
+                id: uniqueId, type: state.currentMode, timestamp: timestampIso, coach: state.coachName || "Non specificato", 
+                athlete: athlete.name, position: state.currentPos, series: seriesLabel,
+                windDir: state.currentWind.dir, windInt: state.currentWind.int, shots: normalizedShots
+            };
+
+            state.history.push(dataPacket); state.syncQueue.push(cloudPacket);
+            ensureSeriesCounters(athlete);
+            athlete.seriesByMode[state.currentMode][state.currentPos]++;
+            
+            state.sessionTimestamp = Date.now(); // Mantieni la sessione viva
+            
+            clearTargetAndState(true); updateHeader();
+            silentAutoSync();
         }
 
         function openSettings() { renderRosterList(); openModal('settings-modal'); }
@@ -904,7 +1014,21 @@
             }
         }
 
-        function factoryReset() { if(!confirm("ATTENZIONE: Reset totale?")) return; localStorage.removeItem(STORAGE_KEY); location.reload(); }
+        function factoryReset() { 
+            if(!confirm("ATTENZIONE: Reset totale? Tutti i dati non sincronizzati andranno persi definitivamente.")) return; 
+            
+            // Pulisce il vecchio storage per sicurezza
+            localStorage.removeItem(STORAGE_KEY); 
+            
+            // Elimina fisicamente il database IndexedDB
+            const req = indexedDB.deleteDatabase(idb.dbName);
+            req.onsuccess = () => location.reload();
+            req.onerror = () => { 
+                console.error("Impossibile eliminare il DB"); 
+                location.reload(); 
+            };
+        }
+
 
         // --- NUOVO STORICO A IMBUTO ---
         function openHistory() {
@@ -1002,6 +1126,10 @@
         function viewHistoryItem(id) { const item = state.history.find(h => h.id.toString() === id.toString()); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
         function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
 
+        // --- COSTANTI DI CALIBRAZIONE TOUCH (OTTIMIZZATO PER GUANTI INVERNALI) ---
+        const TOUCH_DRIFT_TOLERANCE = 30; // Aumentato da 10px a 30px per assorbire il jitter dell'impronta capacitiva
+        const DRAG_DELAY_MS = 800;        // Aumentato da 500ms a 800ms per ritardare l'innesco del drag accidentale
+
         let tapStartTime = 0;
         let tapStartCoords = { x: 0, y: 0 };
         let potentialTap = false;
@@ -1013,29 +1141,28 @@
             
             tapStartTime = Date.now();
             tapStartCoords = { x: e.clientX, y: e.clientY };
-            potentialTap = true; // Assumiamo sia un tap valido fino a prova contraria
+            potentialTap = true; 
 
             if (e.target.classList.contains('shot')) {
-                potentialTap = false; // Se tocco un colpo, annullo l'inserimento
+                potentialTap = false; 
                 const shotNode = e.target;
                 
-                // Timer impostato a 500ms (0.5 secondi) come richiesto per il trascinamento
                 longPressTimer = setTimeout(() => { 
                     isDragging = true; 
                     draggedShot = shotNode; 
                     shotNode.classList.add('dragging'); 
                     targetEl.setPointerCapture(e.pointerId); 
                     if (navigator.vibrate) navigator.vibrate(50); 
-                }, 500);
+                }, DRAG_DELAY_MS);
             }
         });
 
         // --- 2. MOVIMENTO E LOGICA DI TRASCINAMENTO ---
         targetEl.addEventListener('pointermove', (e) => {
-            // Se il dito striscia per più di 10 pixel, annulliamo l'inserimento (tocco accidentale)
             if (potentialTap) {
                 const dist = Math.sqrt(Math.pow(e.clientX - tapStartCoords.x, 2) + Math.pow(e.clientY - tapStartCoords.y, 2));
-                if (dist > 10) potentialTap = false;
+                // Se lo spostamento supera la nuova tolleranza, annulla il tap
+                if (dist > TOUCH_DRIFT_TOLERANCE) potentialTap = false;
             }
 
             if (isDragging && draggedShot && !state.reviewMode) {
@@ -1068,14 +1195,12 @@
             }
 
             if (isDragging && draggedShot) {
-                // Rilascio di un colpo trascinato
                 draggedShot.classList.remove('dragging'); 
                 targetEl.releasePointerCapture(e.pointerId); 
                 draggedShot = null; 
                 isDragging = false; 
                 saveState(); 
-            } else if (potentialTap && elapsedTime <= 500) {
-                // È un tap valido: fronte di discesa entro 0.5s, senza strisciare, in un'area libera
+            } else if (potentialTap && elapsedTime <= DRAG_DELAY_MS) {
                 if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
                     if (state.currentShots.length >= MAX_SHOTS) return;
                     const rect = targetEl.getBoundingClientRect(); 
@@ -1158,64 +1283,20 @@
             renderShotsFromState();
         }
 
-        // --- 4. SALVATAGGIO DEI DATI ---
-        function saveSeries() {
-            if(state.activeAthletes.length === 0) return alert("Nessun atleta selezionato.");
-            if (state.currentShots.length === 0) return alert("Nessun colpo.");
-            
-            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
-            const exportW = 400; const exportH = 440;
-            const normalizedShots = state.currentShots.map(s => {
-                const scaleX = s.bx ? (exportW / s.bx) : 1; const scaleY = s.by ? (exportH / s.by) : 1;
-                const nx = Math.round(s.x * scaleX);
-                const ny = Math.round(s.y * scaleY);
-                const dist = Math.round(Math.sqrt(Math.pow(nx - 200, 2) + Math.pow(ny - 220, 2)));
-                const threshold = state.currentPos === 'T' ? 70.4 : 180;
-                
-                return { 
-                    seq: s.seq, 
-                    x: nx, 
-                    y: ny, 
-                    distanza: dist, 
-                    esito: (dist <= threshold) ? 'Bersaglio' : 'Errore' 
-                };
-            });
-            const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-            const timestampIso = new Date().toISOString();
-            const seriesLabel = `${getCurrentSeries(athlete)}${state.currentPos}`;
-
-            const dataPacket = {
-                id: uniqueId, type: state.currentMode, athleteId: athlete.id, athlete: athlete.name, position: state.currentPos,
-                series: seriesLabel, windDir: state.currentWind.dir, windInt: state.currentWind.int,
-                shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: timestampIso
-            };
-            
-            const cloudPacket = {
-                id: uniqueId, type: state.currentMode, timestamp: timestampIso, coach: state.coachName || "Non specificato", 
-                athlete: athlete.name, position: state.currentPos, series: seriesLabel,
-                windDir: state.currentWind.dir, windInt: state.currentWind.int, shots: normalizedShots
-            };
-
-            state.history.push(dataPacket); state.syncQueue.push(cloudPacket);
-            ensureSeriesCounters(athlete);
-            athlete.seriesByMode[state.currentMode][state.currentPos]++;
-            clearTargetAndState(true); updateHeader();
-            silentAutoSync();
-        }
-
         window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
         
-        // 1. Ritardo di 3 secondi quando torna il Wi-Fi per far stabilizzare la rete
+        // 1. Ritardo di 5 secondi quando torna il Wi-Fi per far stabilizzare la rete
         window.addEventListener('online', () => {
-            setTimeout(silentAutoSync, 3000);
+            setTimeout(silentAutoSync, 5000);
         });
 
-        // 2. Sincronizza in automatico quando riapri l'app o sblocchi lo schermo del tablet
+        // 2. Sincronizza in automatico e controlla la sessione quando riapri l'app
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible") {
                 silentAutoSync();
+                checkStaleSession();
             }
-        });        
+        });       
         
         document.addEventListener('pointerdown', lockPortrait, { once: true });
         lockPortrait();
