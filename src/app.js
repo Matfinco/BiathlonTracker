@@ -257,7 +257,10 @@
   function fillSettings(){
     const m=state.meta;
     for(const [input,key]of [['coach-name','coachName'],['cloud-url','cloudUrl'],['looker-url','lookerUrl'],['api-token','apiToken'],['shot-limit','shotLimit'],['theme-select','theme'],['shot-color-select','shotColor']])$(input).value=m[key]??'';
-    $('access-status').textContent=m.coachName&&m.cloudUrl&&m.apiToken?`Configurato per ${m.coachName}.`:'Apri il collegamento personale ricevuto dall’amministratore, oppure incollalo qui.';
+    const coach=Boolean(m.coachName&&m.cloudUrl&&m.apiToken);
+    $('access-status').textContent=coach?m.coachName:m.adminToken?'Amministratore':'Nessun allenatore';
+    $('access-help').textContent=coach?'Accesso allenatore configurato su questo dispositivo.':m.adminToken?'Per registrare, scegli il tuo nome in Gestisci allenatori → Usa su questo dispositivo.':'Attiva il tuo collegamento personale in Accesso e sincronizzazione.';
+    $('connection-result').textContent='';
     renderRoster();
   }
   function offerAccess(candidate){
@@ -285,6 +288,12 @@
       const key=node('p',`Chiave associata: …${coach.keyHint}`,{class:'coach-key'});
       const actions=node('div',undefined,{class:'coach-actions'});
       if(coach.active){
+        const use=button('Usa su questo dispositivo',()=>{
+          const link=D.invitationLink({coachName:coach.name,apiToken:coach.token,cloudUrl:state.meta.adminUrl},location.href);
+          offerAccess(D.invitation(link));
+        });
+        use.dataset.action='use-access';
+        actions.append(use);
         actions.append(button('Condividi accesso',()=>shareAccess(coach),'primary'));
         actions.append(button('Mostra chiave',e=>{
           const shown=key.dataset.shown==='true';
@@ -407,6 +416,24 @@
     catch(error){if(error.name!=='AbortError')showError(error);}
   });
   $('share-back').addEventListener('click',()=>{openDialog('admin-dialog');renderAdmin();});
+  function settingsConfig(){
+    return {
+      coachName:$('coach-name').value.trim(),cloudUrl:D.syncUrl($('cloud-url').value),lookerUrl:D.validUrl($('looker-url').value),apiToken:$('api-token').value.trim(),shotLimit:D.limit($('shot-limit').value),theme:$('theme-select').value,shotColor:$('shot-color-select').value
+    };
+  }
+  $('connection-check').addEventListener('click',async()=>{
+    $('connection-check').disabled=true;
+    $('connection-result').textContent='Verifica in corso…';
+    try{
+      if(!navigator.onLine)throw Error('Serve una connessione per verificare l’accesso a Google. I dati locali restano disponibili.');
+      const config=settingsConfig();
+      if(!config.coachName)throw Error('Attiva il tuo accesso allenatore per verificare la destinazione delle serie.');
+      const result=await sync.request(config,{action:'connection'});
+      if(!result.databaseSheet)throw Error('Aggiorna il codice Google Apps Script alla versione attuale per verificare il foglio di destinazione.');
+      $('connection-result').textContent=`Accesso verificato per ${result.coach}. Destinazione delle serie: ${result.databaseSheet}. Salva le impostazioni se hai modificato i campi.`;
+    }catch(error){$('connection-result').textContent=error.message;}
+    finally{$('connection-check').disabled=false;}
+  });
   function renderRoster(){
     $('roster-list').replaceChildren(...state.meta.roster.map(a=>{
       const li=node('li'),name=node('strong',a.name),remove=button('Rimuovi',async()=>{
@@ -758,10 +785,7 @@
   $('settings-form').addEventListener('submit',async e=>{
     e.preventDefault();
     try{
-      const config={
-        coachName:$('coach-name').value.trim(),cloudUrl:D.validUrl($('cloud-url').value),lookerUrl:D.validUrl($('looker-url').value),apiToken:$('api-token').value.trim(),shotLimit:D.limit($('shot-limit').value),theme:$('theme-select').value,shotColor:$('shot-color-select').value
-      };
-      if(config.cloudUrl&&new URL(config.cloudUrl).hostname!=='script.google.com')throw Error('Inserisci l’indirizzo del deployment Google Apps Script.');
+      const config=settingsConfig();
       if(state.outbox.length&&state.meta.cloudUrl&&config.cloudUrl!==state.meta.cloudUrl&&!await confirmAction('Cambia destinazione',`Ci sono ${state.outbox.length} operazioni pendenti. Inviarle al nuovo indirizzo configurato?`,'Cambia destinazione'))return;
       const done=await change(s=>{
         if(s.meta.syncLease?.until>Date.now()&&(config.cloudUrl!==s.meta.cloudUrl||config.apiToken!==s.meta.apiToken))throw Error('Attendi la fine della sincronizzazione prima di cambiare indirizzo o chiave.');
@@ -936,7 +960,7 @@
         worker?.addEventListener('statechange',check);
       });
       check();
-      const cache=await caches.open('biathlon-field-v6-3');
+      const cache=await caches.open('biathlon-field-v6-4');
       $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       if(!navigator.serviceWorker.controller)ready.active?.postMessage({
         type:'CLAIM'

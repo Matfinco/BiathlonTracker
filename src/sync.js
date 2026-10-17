@@ -26,9 +26,11 @@
       return this.running;
     }
     async request(config,payload){
+      const url=D.syncUrl(config.cloudUrl);
+      if(!url||!String(config.apiToken||'').trim())throw Error('Attiva il tuo accesso allenatore con il collegamento personale. Per leggere o scrivere su Google servono indirizzo del servizio e credenziale valida.');
       const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),this.timeout);
       try{
-        const response=await this.fetch(D.validUrl(config.cloudUrl),{
+        const response=await this.fetch(url,{
           method:'POST',headers:{
             'Content-Type':'text/plain;charset=utf-8'
           },body:JSON.stringify({
@@ -56,7 +58,7 @@
       };
       const claim=await this.repo.mutate(s=>{
         if(!s.outbox.length)return null;
-        if(!s.meta.cloudUrl||!s.meta.coachName||!s.meta.apiToken)throw Error('Configura indirizzo Google, firma e chiave personale prima di sincronizzare.');
+        if(!s.meta.cloudUrl||!s.meta.coachName||!s.meta.apiToken)throw Error('Attiva il tuo accesso allenatore prima di sincronizzare. Se sei amministratore, scegli il tuo nome in Gestisci allenatori e premi Usa su questo dispositivo.');
         if(s.meta.syncLease&&s.meta.syncLease.until>Date.now()&&s.meta.syncLease.owner!==this.owner)return {
           blockedUntil:s.meta.syncLease.until
         };

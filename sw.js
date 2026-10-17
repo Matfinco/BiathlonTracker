@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='biathlon-field-v6-3';
+const CACHE='biathlon-field-v6-4';
 const ASSETS=['./','index.html','styles/app.css','src/domain.js','src/storage.js','src/sync.js','src/app.js','manifest.webmanifest','icons/target.svg','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));

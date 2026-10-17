@@ -230,35 +230,22 @@
     </button>
    </div>
    <div class="dialog-content">
-    <section class="access-card" aria-labelledby="access-status-title">
-     <h3 id="access-status-title">Accesso allenatore</h3>
-     <p id="access-status">Nessun accesso configurato.</p>
-     <form id="access-form">
-      <label for="access-link">Collegamento personale ricevuto</label>
-      <input id="access-link" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui il collegamento" required=""/>
-      <button type="submit">Configura accesso</button>
-     </form>
+    <section class="coach-identity" aria-labelledby="access-status">
+     <h3 id="access-status">Nessun allenatore</h3>
+     <p id="access-help" class="helper"></p>
     </section>
+    <h3>Atleti</h3>
+    <p class="helper">Elenco salvato su questo dispositivo, disponibile anche offline.</p>
+    <form class="add-athlete" id="athlete-form">
+     <label class="sr-only" for="new-athlete">Nome del nuovo atleta</label>
+     <input id="new-athlete" maxlength="120" placeholder="Nome e cognome" required="" type="text"/>
+     <button type="submit">Aggiungi</button>
+    </form>
+    <ul class="record-list" id="roster-list"></ul>
+    <button class="secondary" id="roster-download">Scarica atleti da Google</button>
+    <hr/>
+    <h3>Preferenze</h3>
     <form id="settings-form">
-     <details class="manual-access">
-      <summary>Configurazione manuale dell’accesso</summary>
-     <label for="coach-name">
-      Firma allenatore
-     </label>
-     <input autocomplete="name" id="coach-name" maxlength="120" type="text"/>
-     <label for="cloud-url">
-      Indirizzo Google Apps Script
-     </label>
-     <input id="cloud-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" type="url"/>
-     <label for="api-token">
-      Chiave personale allenatore
-     </label>
-     <input autocomplete="off" id="api-token" type="password"/>
-     </details>
-     <label for="looker-url">
-      Indirizzo statistiche Looker Studio
-     </label>
-     <input id="looker-url" inputmode="url" type="url"/>
      <div class="form-grid">
       <div>
        <label for="shot-limit">
@@ -291,28 +278,32 @@
        Bianco e nero ad alto contrasto
       </option>
      </select>
+     <label for="looker-url">Indirizzo statistiche Looker Studio</label>
+     <input id="looker-url" inputmode="url" type="url"/>
      <button type="submit">
       Salva impostazioni
      </button>
     </form>
-    <hr/>
-    <h3>
-     Archivio atleti
-    </h3>
-    <form class="add-athlete" id="athlete-form">
-     <label class="sr-only" for="new-athlete">
-      Nome del nuovo atleta
-     </label>
-     <input id="new-athlete" maxlength="120" placeholder="Nome e cognome" required="" type="text"/>
-     <button type="submit">
-      Aggiungi
-     </button>
-    </form>
-    <ul class="record-list" id="roster-list">
-    </ul>
-    <button class="secondary" id="roster-download">
-     Scarica atleti da Google
-    </button>
+    <details class="manual-access" id="access-settings">
+     <summary>Accesso e sincronizzazione</summary>
+     <form id="access-form">
+      <label for="access-link">Collegamento personale ricevuto</label>
+      <input id="access-link" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui il collegamento" required=""/>
+      <button type="submit">Configura accesso</button>
+     </form>
+     <p class="helper">Il solo link pubblico dell’app non abilita letture o scritture su Google. Scaricare gli atleti richiede un accesso allenatore valido.</p>
+     <h3>Configurazione manuale</h3>
+     <p class="helper">Usa il servizio Google che termina con /exec, insieme alla tua firma e alla chiave personale.</p>
+     <label for="coach-name">Firma allenatore</label>
+     <input form="settings-form" autocomplete="name" id="coach-name" maxlength="120" type="text"/>
+     <label for="cloud-url">Indirizzo del servizio di sincronizzazione (/exec)</label>
+     <input form="settings-form" id="cloud-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" type="url"/>
+     <label for="api-token">Chiave personale allenatore</label>
+     <input form="settings-form" autocomplete="off" id="api-token" type="password"/>
+     <button form="settings-form" type="submit" class="secondary">Salva accesso manuale</button>
+     <button type="button" class="secondary" id="connection-check">Verifica accesso e destinazione Google</button>
+     <p class="helper" id="connection-result" role="status" aria-live="polite"></p>
+    </details>
     <hr/>
     <h3>
      Backup e recupero

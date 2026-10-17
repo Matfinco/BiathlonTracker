@@ -18,6 +18,13 @@
     if (u.protocol !== 'https:') throw Error('Usa un indirizzo HTTPS valido.');
     return u.href;
   };
+  function syncUrl(value) {
+    const raw=text(value);
+    if(!raw)return '';
+    const match=/^https:\/\/script\.google\.com\/(?:macros\/(?:u\/\d+\/)?s|a\/(?:macros\/[^/?#]+|[^/?#]+\/macros)\/s)\/([A-Za-z0-9_-]+)\/exec\/?(?:\?[^#\s]*)?$/.exec(raw);
+    if(!match)throw Error('Per sincronizzare serve l’indirizzo Google Apps Script che termina con /exec. Lo trovi nel collegamento personale allenatore oppure in Gestisci deployment del progetto Google.');
+    return 'https://script.google.com/macros/s/'+match[1]+'/exec';
+  }
   function invitation(value) {
     try {
       const raw=text(value);
@@ -321,6 +328,6 @@
     return s;
   }
   root.BiathlonDomain={
-    MODES,VERSION,clone,uid,id,validUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,packet,enqueue,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
+    MODES,VERSION,clone,uid,id,validUrl,syncUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,packet,enqueue,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
   };
 })(globalThis);

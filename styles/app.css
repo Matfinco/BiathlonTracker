@@ -112,13 +112,15 @@ form>button{
   width:100%;
   margin-top:14px
 }
-.access-card,.coach-list>li{
+.coach-list>li{
   padding:14px;
   border:2px solid var(--line);
   border-radius:12px;
   background:var(--surface)
 }
-.access-card h3{margin-top:0}
+.coach-identity h3{margin:0}
+.coach-identity p{margin:6px 0 12px}
+.manual-access>button{width:100%;margin-top:12px}
 .manual-access{margin:20px 0}
 .manual-access summary{cursor:pointer;padding:16px 0;font-weight:700;min-height:56px}
 .manual-access summary:focus-visible{outline:4px solid var(--focus)}

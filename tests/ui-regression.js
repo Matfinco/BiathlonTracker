@@ -39,6 +39,10 @@
     });
     await flush();
   }
+  async function settings(){
+    await element('menu-open').click();
+    await document.querySelectorAll('[data-open]').find(b=>b.dataset.open==='settings-dialog').click();
+  }
   await flush();
   assert(element('startup').hidden,'Application did not start');
   assert(!element('app').inert,'Application still inert');
@@ -46,6 +50,79 @@
     assert(element('shot-count').textContent==='0 / 5 colpi');
     assert(element('athlete-select').value==='1');
     assert(element('position-button').textContent==='Terra');
+  });
+  await test('Public access can keep local athletes offline but cannot download or upload to Google',async()=>{
+    let calls=0;
+    const oldFetch=globalThis.fetch;
+    globalThis.fetch=async()=>{calls++;throw Error('Anonymous cloud request');};
+    navigator.onLine=true;
+    try{
+      await tap();await element('save-button').click();await flush();
+      await settings();
+      assert(element('access-status').textContent==='Nessun allenatore');
+      assert(element('roster-list').children.length===2);
+      await element('roster-download').click();await flush();
+      await element('sync-now').click();await flush();
+      assert(calls===0);
+      assert(__uiRepo.snapshot.outbox.length===1);
+      assert(__uiRepo.snapshot.meta.roster.length===2);
+      const fresh=BiathlonDomain.create();
+      assert(fresh.meta.roster.length===0&&!fresh.meta.apiToken&&!fresh.meta.adminToken);
+    }finally{globalThis.fetch=oldFetch;navigator.onLine=false;}
+  });
+  await test('Connection check identifies the destination with a personal credential and no data upload',async()=>{
+    const oldFetch=globalThis.fetch;
+    let request;
+    globalThis.fetch=async(url,options)=>{
+      request=JSON.parse(options.body);
+      return {ok:true,json:async()=>({status:'success',protocolVersion:2,coach:'Coach',databaseSheet:'Database_Colpi'})};
+    };
+    navigator.onLine=true;
+    try{
+      await settings();
+      element('coach-name').value='Coach';
+      element('cloud-url').value='https://script.google.com/macros/s/test/exec';
+      element('api-token').value='personal-test-token';
+      await element('connection-check').click();await flush();
+      assert(request.action==='connection'&&request.token==='personal-test-token');
+      assert(!request.inserts&&!request.deletes);
+      assert(element('connection-result').textContent.includes('Database_Colpi'));
+      assert(!__uiRepo.snapshot.meta.apiToken,'Checking must not save credentials before confirmation');
+    }finally{globalThis.fetch=oldFetch;navigator.onLine=false;}
+  });
+  await test('Administrator can activate a separate coach access on the same device',async()=>{
+    const oldFetch=globalThis.fetch;
+    const endpoint='https://script.google.com/macros/s/test/exec',adminToken='private-admin-test-token',coachToken='personal-coach-test-token';
+    const s=__uiRepo.snapshot;
+    s.meta.adminUrl=endpoint;s.meta.adminToken=adminToken;
+    await __uiRepo.onchange();await flush();
+    const requests=[];
+    globalThis.fetch=async(url,options)=>{
+      const request=JSON.parse(options.body);requests.push(request);
+      if(request.action==='admin.list'){
+        assert(request.token===adminToken);
+        return {ok:true,json:async()=>({status:'success',protocolVersion:2,coaches:[{id:'coach-id',name:'Coach',active:true,token:coachToken,keyHint:'st-token'}]})};
+      }
+      assert(request.action==='roster'&&request.token===coachToken);
+      return {ok:true,json:async()=>({status:'success',protocolVersion:2,coach:'Coach',roster:[{id:'remote-id',name:'Atleta remoto'}]})};
+    };
+    navigator.onLine=true;
+    try{
+      await settings();
+      assert(element('access-status').textContent==='Amministratore');
+      await element('admin-open').click();await flush();
+      const use=element('admin-coaches').querySelectorAll('button').find(b=>b.dataset.action==='use-access');
+      assert(use);
+      await use.click();await flush();
+      assert(!__uiRepo.snapshot.meta.apiToken);
+      assert(requests.length===1,'Coach activation must require confirmation');
+      await element('access-activate').click();await flush();
+      assert(__uiRepo.snapshot.meta.apiToken===coachToken);
+      assert(__uiRepo.snapshot.meta.adminToken===adminToken);
+      assert(__uiRepo.snapshot.meta.cloudUrl===endpoint);
+      assert(__uiRepo.snapshot.meta.roster.some(a=>a.id==='remote-id'));
+      assert(element('access-status').textContent==='Coach');
+    }finally{globalThis.fetch=oldFetch;navigator.onLine=false;}
   });
   await test('UI records repeated taps at the same point',async()=>{
     await tap();

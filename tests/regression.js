@@ -371,6 +371,18 @@
     equal(repo.snapshot.outbox.length,1);
     assert(!repo.snapshot.meta.syncLease);
   });
+  await test('Missing credentials and public app or spreadsheet URLs never start a cloud request',async()=>{
+    let requests=0;
+    const engine=new BiathlonSync(repoFor(D.create()),{fetch:async()=>{requests++;throw Error('Unexpected network request');}});
+    const endpoint='https://script.google.com/macros/s/test/exec';
+    for(const config of [{cloudUrl:endpoint,apiToken:''},{cloudUrl:'',apiToken:'personal-token'},{cloudUrl:'https://matfinco.github.io/BiathlonTracker/',apiToken:'personal-token'},{cloudUrl:'https://docs.google.com/spreadsheets/d/id/edit',apiToken:'personal-token'}]){
+      let rejected=false;
+      try{await engine.request(config,{action:'roster'});}catch(error){rejected=true;}
+      assert(rejected);
+    }
+    equal(requests,0);
+    equal(D.syncUrl('https://script.google.com/a/macros/team.example/s/deployment/exec'),'https://script.google.com/macros/s/deployment/exec');
+  });
   // Spreadsheet fixtures exercise the actual Apps Script handlers without touching a Google account.
   class Range{
     constructor(sheet,row,col,nr=1,nc=1){
@@ -589,6 +601,50 @@
     equal(sheets.Database.getLastRow(),2);
     equal(sheets.Database.grid[1][11],'Errore');
     equal(sheets.Database.grid[0].slice(0,15),BIATHLON_HEADERS.slice(0,15));
+  });
+  await test('Database_Colpi receives authenticated series and the connection check does not change data',()=>{
+    server();
+    sheets.Database_Colpi=sheets.Database;
+    delete sheets.Database;
+    const before=D.clone(sheets.Anagrafica.grid);
+    const connection=post({action:'connection'});
+    equal(connection.status,'success');
+    equal(connection.databaseSheet,'Database_Colpi');
+    equal(connection.coach,'Coach');
+    equal(sheets.Anagrafica.grid,before);
+    equal(sheets.Database_Colpi.getLastRow(),1);
+    assert(!sheets._BiathlonDeleted);
+    equal(post({inserts:[serverPacket()]}).status,'success');
+    equal(sheets.Database_Colpi.getLastRow(),2);
+  });
+  await test('An explicitly configured database takes precedence over automatic names',()=>{
+    server();
+    sheets.Database_Colpi=new Sheet('Database_Colpi',[BIATHLON_HEADERS.slice()]);
+    equal(post({action:'connection'}).databaseSheet,'Database_Colpi');
+    properties.BIATHLON_DATABASE_SHEET='Database';
+    equal(post({inserts:[serverPacket()]}).status,'success');
+    equal(sheets.Database.getLastRow(),2);
+    equal(sheets.Database_Colpi.getLastRow(),1);
+    properties.BIATHLON_DATABASE_SHEET='Missing';
+    equal(post({action:'connection'}).status,'error');
+  });
+  await test('Anonymous and invalid credentials cannot read or change any spreadsheet',()=>{
+    server();
+    let reads=0;
+    const before=D.clone(Object.fromEntries(Object.entries(sheets).map(([k,v])=>[k,v.grid])));
+    SpreadsheetApp.openById=()=>{reads++;throw Error('Unauthorized sheet access');};
+    for(const token of ['', 'invalid-token']){
+      for(const action of ['roster','connection','admin.list']){
+        const response=post({token,action});
+        equal(response.status,'error');
+        assert(!response.roster&&!response.coaches&&!response.coach);
+      }
+      equal(post({token,inserts:[serverPacket()]}).status,'error');
+      equal(post({token,deletes:['old-series-id']}).status,'error');
+      equal(doGet({parameter:{token}}).status,'error');
+    }
+    equal(reads,0);
+    equal(Object.fromEntries(Object.entries(sheets).map(([k,v])=>[k,v.grid])),before);
   });
   const admin=(action,extra={})=>post({token:'admin-test-token-that-is-private',action,...extra});
   await test('Coach and unauthenticated requests cannot list or manage personal accesses',()=>{

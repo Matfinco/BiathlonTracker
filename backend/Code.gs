@@ -103,8 +103,14 @@ function writeRows_(sheet,start,rows,width){
   if(required>sheet.getMaxRows())sheet.insertRowsAfter(sheet.getMaxRows(),required-sheet.getMaxRows());
   sheet.getRange(start,1,rows.length,width).setValues(rows);
 }
+function databaseSheetName_(ss){
+  var name=PropertiesService.getScriptProperties().getProperty('BIATHLON_DATABASE_SHEET');
+  if(!name)name=ss.getSheetByName('Database_Colpi')?'Database_Colpi':'Database';
+  if(!ss.getSheetByName(name))throw Error('Tab '+name+' non trovato. Usa Database_Colpi o Database, oppure configura BIATHLON_DATABASE_SHEET.');
+  return name;
+}
 function database_(ss){
-  var name=PropertiesService.getScriptProperties().getProperty('BIATHLON_DATABASE_SHEET')||'Database',sheet=ss.getSheetByName(name);
+  var name=databaseSheetName_(ss),sheet=ss.getSheetByName(name);
   if(!sheet)throw Error('Tab '+name+' non trovato. Nessun altro foglio è stato modificato.');
   if(sheet.getMaxColumns()<18)sheet.insertColumnsAfter(sheet.getMaxColumns(),18-sheet.getMaxColumns());
   if(sheet.getLastRow()===0)sheet.getRange(1,1,1,18).setValues([BIATHLON_HEADERS]);
@@ -179,6 +185,9 @@ function doPost(e){
       if(p.coach!==authorized.name)throw Error('La firma deve corrispondere all’allenatore autorizzato: '+authorized.name);
     });
     var ss=spreadsheet_();
+    if(data.action==='connection')return json_({
+      status:'success',protocolVersion:2,coach:authorized.name,databaseSheet:databaseSheetName_(ss)
+    });
     if(data.action==='roster'){
       var listed=roster_(ss);
       SpreadsheetApp.flush();

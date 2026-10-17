@@ -25,6 +25,10 @@ Nel progetto Google eseguire `configuraBiathlon` dopo aver aggiornato il deploym
 
 Ogni allenatore riceve una chiave personale associata alla propria firma. Lo script rifiuta chiavi assenti o revocate, firme diverse da quella autorizzata e cancellazioni di serie di altri allenatori. L’app può raccogliere bozze offline; soltanto credenziali valide consentono lettura dell’anagrafica e scrittura sul foglio.
 
+Le impostazioni mostrano il nome dell’allenatore, gli atleti e poi le preferenze; accesso e sincronizzazione sono in una sezione richiudibile. L’amministratore può attivare il proprio accesso allenatore con **Usa su questo dispositivo**. Il comando **Verifica accesso e destinazione Google** controlla il servizio senza inviare colpi. Sono riconosciuti i tab `Database_Colpi` e `Database`, con precedenza all’eventuale nome impostato in `BIATHLON_DATABASE_SHEET`.
+
+All’avvio gli atleti sono letti dall’archivio locale, conservato per l’uso offline. Il solo link pubblico, aperto in un browser nuovo, non scarica l’anagrafica e non abilita invii. La protezione richiede che anche il deployment Google esegua il codice aggiornato.
+
 GitHub Pages può continuare a pubblicare dalla radice del ramo `main`: non è necessaria una compilazione. Dopo il push verificare il risultato dell’eventuale pubblicazione GitHub Pages e aprire la pagina con rete disponibile prima dell’uso offline.
 
 ## Dati e compatibilità
