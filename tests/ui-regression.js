@@ -154,6 +154,27 @@
   await test('UI deleting the last saved series clears its history row',async()=>{
     await tap();await element('save-button').click();await flush();await element('history-open').click();const row=element('history-list').children[0],buttons=row.children[1];const pending=buttons.children[2].click();await flush();element('confirm-dialog').close('accept');await pending;await flush();assert(__uiRepo.snapshot.series.length===0);assert(element('history-list').children.length===1);assert(element('history-list').children[0].textContent==='Nessuna serie per questa selezione.');
   });
+  await test('UI wind selection shows the original flag poses on a descending scale',async()=>{
+    await element('wind-open').click();
+    const levels=element('wind-levels').children;
+    assert(levels.length===6);
+    assert(levels.map(b=>b.dataset.level).join(',')==='5,4,3,2,1,0');
+    assert(levels.every(b=>b.querySelector('svg')));
+    assert(levels[0].querySelector('rect').getAttribute('transform')==='rotate(0 24 17)');
+    assert(levels[5].querySelector('rect').getAttribute('transform')==='rotate(90 24 17)');
+  });
+  await test('UI wind choice stays a draft until confirmed and is restored after cancellation',async()=>{
+    await element('wind-open').click();
+    await element('wind-levels').children.find(b=>b.dataset.level==='3').click();
+    assert(BiathlonDomain.draft(__uiRepo.snapshot).wind.int===0);
+    element('wind-dialog').close();
+    await element('wind-open').click();
+    assert(element('wind-levels').children.find(b=>b.getAttribute('aria-pressed')==='true').dataset.level==='0');
+    await element('wind-levels').children.find(b=>b.dataset.level==='3').click();
+    await element('wind-save').click();await flush();
+    assert(BiathlonDomain.draft(__uiRepo.snapshot).wind.int===3);
+    assert(element('wind-open').querySelector('rect').getAttribute('transform')==='rotate(45 24 17)');
+  });
   globalThis.testDone=true;
 })().catch(error=>{
   testResults.push({

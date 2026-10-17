@@ -105,6 +105,21 @@
   function windText(w){
     return !w||w.int===0?'Vento: calmo':`Vento: ${arrows[w.dir]} ${w.int}/5`;
   }
+  function windFlag(level){
+    // Keep the six visual references from the original field interface.
+    const angle=[90,75,60,45,25,0][level]??90;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox','0 0 80 72');
+    svg.setAttribute('class','wind-flag');
+    svg.setAttribute('aria-hidden','true');
+    svg.setAttribute('focusable','false');
+    const pole=document.createElementNS('http://www.w3.org/2000/svg','line');
+    for(const [key,value]of Object.entries({x1:22,y1:10,x2:22,y2:64,class:'wind-flag-pole'}))pole.setAttribute(key,String(value));
+    const cloth=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    for(const [key,value]of Object.entries({x:24,y:12,width:34,height:10,rx:1,transform:`rotate(${angle} 24 17)`,class:'wind-flag-cloth'}))cloth.setAttribute(key,String(value));
+    svg.append(pole,cloth);
+    return svg;
+  }
   function render(){
     const m=state.meta,d=currentDraft(),r=record(),active=r||d,values=active?.shots||[],isReview=!!r;
     if(review&&!r)review=null;
@@ -126,9 +141,10 @@
     $('series-button').disabled=isReview||locked||!d;
     const session=state.sessions.find(s=>s.id===(active?.sessionId||m.sessionId));
     $('session-label').textContent=(isReview?'Storico · ':'')+(session?.title||'Sessione');
-    $('wind-open').textContent=windText(isReview?{
+    const displayedWind=isReview?{
       dir:r.windDir,int:r.windInt
-    }:(d?.wind||m.currentWind));
+    }:(d?.wind||m.currentWind);
+    $('wind-open').replaceChildren(windFlag(displayedWind.int),node('span',windText(displayedWind)));
     $('wind-open').disabled=isReview||locked;
     $('shot-count').textContent=isReview?`${values.length} colpi`:`${values.length} / ${m.shotLimit} colpi`;
     const hits=values.filter(s=>s.esito==='Bersaglio').length;
@@ -383,14 +399,17 @@
       b.setAttribute('aria-pressed',String(windChoice.dir===dir));
       return b;
     }));
-    $('wind-levels').replaceChildren(...[0,1,2,3,4,5].map(level=>{
-      const b=button(level===0?'0 · Calmo':String(level),()=>{
+    $('wind-levels').replaceChildren(...[5,4,3,2,1,0].map(level=>{
+      const b=button('',()=>{
         windChoice.int=level;
         if(!level)windChoice.dir='C';
         else if(windChoice.dir==='C')windChoice.dir='N';
         drawWind();
       });
-      b.setAttribute('aria-label',`Intensità ${level} su 5`);
+      b.classList.add('wind-level-button');
+      b.append(windFlag(level),node('span',String(level)));
+      b.setAttribute('data-level',String(level));
+      b.setAttribute('aria-label',`Intensità ${level} su 5${level===0?': bandierina pendente':level===5?': bandierina distesa':''}`);
       b.setAttribute('aria-pressed',String(windChoice.int===level));
       return b;
     }));
@@ -760,7 +779,7 @@
         worker?.addEventListener('statechange',check);
       });
       check();
-      const cache=await caches.open('biathlon-field-v6-1');
+      const cache=await caches.open('biathlon-field-v6-2');
       $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       if(!navigator.serviceWorker.controller)ready.active?.postMessage({
         type:'CLAIM'

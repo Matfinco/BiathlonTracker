@@ -40,7 +40,7 @@
           body:'cached app'
         });
       },match:async request=>contents.get(typeof request==='string'?request:request.url)
-    }),keys:async()=>['unrelated-app','biathlon-field-v6-0','biathlon-field-v6-1'],delete:async name=>{
+    }),keys:async()=>['unrelated-app','biathlon-field-v6-1','biathlon-field-v6-2'],delete:async name=>{
       deleted.push(name);
     }
   };
@@ -83,7 +83,7 @@
       waitUntil:p=>task=p
     });
     await task;
-    assert(deleted.length===1&&deleted[0]==='biathlon-field-v6-0');
+    assert(deleted.length===1&&deleted[0]==='biathlon-field-v6-1');
     assert(claims===1);
   });
   await test('Worker activation requires an explicit update message',()=>{

@@ -348,17 +348,21 @@
    </div>
    <div class="dialog-content">
     <p class="helper">
-     Le frecce indicano dove soffia il vento: ↑ verso i bersagli, ↓ verso la piazzola.
+     Scegli la bandierina più simile a quella che osservi al poligono.
     </p>
-    <div class="compass" id="wind-directions">
-    </div>
-    <h3>
-     Intensità osservata
-    </h3>
-    <div class="wind-levels" id="wind-levels">
+    <div class="wind-panel">
+     <section aria-labelledby="wind-strength-title">
+      <h3 id="wind-strength-title">Intensità</h3>
+      <div class="wind-levels" id="wind-levels"></div>
+     </section>
+     <section aria-labelledby="wind-direction-title">
+      <h3 id="wind-direction-title">Direzione</h3>
+      <p class="helper">↑ Verso i bersagli<br>↓ Verso la piazzola</p>
+      <div class="compass" id="wind-directions"></div>
+     </section>
     </div>
     <p class="helper">
-     0 = calmo · 5 = intensità massima della scala osservativa.
+     0 = bandierina pendente · 5 = bandierina distesa.
     </p>
     <button id="wind-save">
      Conferma vento

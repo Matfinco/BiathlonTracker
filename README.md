@@ -11,6 +11,7 @@ App per smartphone e tablet per registrare i colpi al poligono, conservare le se
 - Salva e Annulla restano raggiungibili nella barra inferiore. Tema chiaro da esterno o scuro, marcatori colorati con forme diverse o bianco/nero, comandi di almeno 56 pixel per le operazioni principali.
 - Storico di tutte le sessioni, bozze da riprendere, riepilogo locale, backup JSON e ripristino. Aprire una correzione conserva la serie originale fino al nuovo salvataggio.
 - Blocco dei comandi per trasporto/pulizia e mantenimento opzionale dello schermo acceso, dove il browser lo consente.
+- Selezione del vento tramite bandierine alle sei inclinazioni originali, dal livello 0 pendente al 5 disteso, su scala verticale con grandi pulsanti. La bandierina scelta resta visibile anche accanto al comando Vento.
 
 Aprire almeno una volta l’app con connessione e attendere nel Menu la conferma **“App pronta per la riapertura senza connessione”**. Poi provare la riapertura in modalità aereo. Il salvataggio locale funziona indipendentemente dalla sincronizzazione.
 

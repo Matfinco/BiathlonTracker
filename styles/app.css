@@ -494,8 +494,54 @@ dialog::backdrop{
   outline-offset:1px
 }.wind-levels{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px
+  grid-template-columns:1fr;
+  gap:8px
+}
+.wind-panel{
+  display:grid;
+  grid-template-columns:112px minmax(0,1fr);
+  gap:12px;
+  align-items:start
+}
+.wind-panel h3{margin-top:8px}
+.wind-panel .compass{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  width:100%;
+  margin-top:12px
+}
+.wind-panel .compass button{
+  min-width:0;
+  min-height:56px;
+  padding:6px
+}
+.wind-level-button{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  min-height:64px;
+  width:100%;
+  padding:4px 8px;
+  gap:2px;
+  font-size:.85rem
+}
+.wind-level-button[aria-pressed=true]{
+  border-color:var(--accent);
+  background:var(--surface)
+}
+.wind-flag{
+  display:block;
+  width:60px;
+  height:54px;
+  flex-shrink:0
+}
+.wind-flag-pole{stroke:var(--text);stroke-width:3.5;stroke-linecap:round}
+.wind-flag-cloth{fill:#cf2525;stroke:var(--text);stroke-width:.7}
+#wind-open{display:inline-flex;align-items:center;gap:2px}
+#wind-open .wind-flag{width:32px;height:36px}
+@media(max-width:359px){
+  .wind-panel{grid-template-columns:1fr}
+  .wind-level-button{justify-content:flex-start;gap:16px}
 }.file-button{
   display:block;
   text-align:center;
