@@ -684,6 +684,12 @@
     shape('circle',{
       cx:200,cy:220,r:180,fill:'#171c21'
     });
+    shape('line',{
+      x1:20,y1:220,x2:380,y2:220,stroke:'#bec4c5','stroke-width':1
+    });
+    shape('line',{
+      x1:200,y1:40,x2:200,y2:400,stroke:'#bec4c5','stroke-width':1
+    });
     shape('circle',{
       cx:200,cy:220,r:70.4,fill:'none',stroke:'white','stroke-width':.8
     });
@@ -992,7 +998,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-6');
+        const cache=await caches.open('biathlon-field-v6-7');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();
