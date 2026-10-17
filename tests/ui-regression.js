@@ -224,6 +224,75 @@
     assert(Math.abs(shots[0].x-240/390*400)<1e-9);
     assert(Math.abs(shots[1].x-220/390*400)<1e-9);
   });
+  async function editTouch(type,extra={}){
+    const rect=element('edit-button').getBoundingClientRect();
+    return element('edit-button').emit(type,{
+      pointerId:2,pointerType:'touch',isPrimary:true,button:0,
+      clientX:(rect.left+rect.right)/2,clientY:(rect.top+rect.bottom)/2,...extra
+    });
+  }
+  await test('One touch finishes editing after a drag and the following click cannot reopen it',async()=>{
+    await tap();await element('edit-button').click();
+    const target=element('target-box');
+    await target.emit('pointerdown',{pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:195,clientY:214});
+    await target.emit('pointermove',{pointerId:1,clientX:240,clientY:240});
+    await target.emit('pointerup',{pointerId:1,clientX:240,clientY:240});
+    await editTouch('pointerdown');await editTouch('pointerup');
+    assert(element('edit-button').getAttribute('aria-pressed')==='false','A second touch would be needed');
+    assert(element('edit-button').textContent==='Modifica colpi');
+    assert(element('shot-picker').hidden&&element('aim-preview').hidden);
+    assert(!target.hasPointerCapture(1));
+    await element('edit-button').emit('click',{detail:1,pointerType:'touch',pointerId:2});
+    assert(element('edit-button').getAttribute('aria-pressed')==='false','Compatibility click reopened editing');
+    const moved=BiathlonDomain.draft(__uiRepo.snapshot).shots[0];
+    assert(Math.abs(moved.x-240/390*400)<1e-9);
+    await tap(300,300);
+    assert(BiathlonDomain.draft(__uiRepo.snapshot).shots.length===2,'Target remained in editing mode');
+  });
+  await test('Finishing editing during a pending shot save retains the moved point',async()=>{
+    await tap();await element('edit-button').click();
+    let release;
+    const target=element('target-box');
+    await target.emit('pointerdown',{pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:195,clientY:214});
+    __uiRepo.queue=new Promise(resolve=>{release=resolve;});
+    const saving=target.emit('pointerup',{pointerId:1,clientX:240,clientY:240});
+    try{
+      await editTouch('pointerdown');await editTouch('pointerup');
+      assert(element('edit-button').getAttribute('aria-pressed')==='false');
+    }finally{release();await saving;}
+    await element('edit-button').emit('click',{detail:1,pointerType:'touch',pointerId:2});
+    assert(element('edit-button').getAttribute('aria-pressed')==='false');
+    assert(Math.abs(BiathlonDomain.draft(__uiRepo.snapshot).shots[0].x-240/390*400)<1e-9);
+  });
+  await test('Scrolling, cancelling or releasing outside Fine modifica does not activate it',async()=>{
+    await tap();await element('edit-button').click();
+    for(const action of ['cancel','scroll','outside']){
+      const start=action==='outside'?{clientX:385}:{};
+      await editTouch('pointerdown',start);
+      if(action==='cancel')await editTouch('pointercancel');
+      if(action==='scroll')await editTouch('pointermove',{clientY:260});
+      await editTouch('pointerup',action==='outside'?{clientX:395}:{});
+      await element('edit-button').emit('click',{detail:1,pointerType:'touch',pointerId:2});
+      assert(element('edit-button').getAttribute('aria-pressed')==='true',`${action} activated the button`);
+    }
+  });
+  await test('Edit controls accept successive pen taps and keyboard or mouse activation',async()=>{
+    await tap();
+    for(const expected of ['true','false']){
+      await editTouch('pointerdown',{pointerType:'pen'});await editTouch('pointerup',{pointerType:'pen'});
+      await element('edit-button').emit('click',{detail:1,pointerType:'pen',pointerId:2});
+      assert(element('edit-button').getAttribute('aria-pressed')===expected);
+    }
+    await editTouch('pointerdown');await editTouch('pointerup');
+    // A browser may omit the touch click: keyboard activation must still work.
+    await element('edit-button').emit('click',{detail:0});
+    assert(element('edit-button').getAttribute('aria-pressed')==='false');
+    await editTouch('pointerdown',{pointerType:'mouse'});await editTouch('pointerup',{pointerType:'mouse'});
+    await element('edit-button').emit('click',{detail:1,pointerType:'mouse'});
+    assert(element('edit-button').getAttribute('aria-pressed')==='true');
+    await element('edit-button').emit('click',{detail:0});
+    assert(element('edit-button').getAttribute('aria-pressed')==='false');
+  });
   async function openCorrection(){
     await tap();await tap(220,220);
     await element('save-button').click();await flush();

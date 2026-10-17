@@ -198,7 +198,8 @@
     const hits=values.filter(s=>s.esito==='Bersaglio').length;
     $('hit-count').textContent=`${hits} ${hits===1?'centro':'centri'}`;
     $('edit-button').hidden=isReview;
-    $('edit-button').textContent=editing?'Fine modifica':'Modifica colpi';
+    const editLabel=editing?'Fine modifica':'Modifica colpi';
+    if($('edit-button').textContent!==editLabel)$('edit-button').textContent=editLabel;
     $('edit-button').setAttribute('aria-pressed',String(editing));
     $('edit-button').disabled=locked||!values.length;
     $('edit-help').hidden=!editing||isReview;
@@ -762,11 +763,41 @@
     });
     if(done)$('series-dialog').close();
   });
-  $('edit-button').addEventListener('click',()=>{
-    if(locked)return;
-    editing=!editing;
+  function setEditing(value){
+    if(locked||review||!currentDraft()?.shots.length)return;
+    editing=value;
     selectedShot=0;
+    resetGesture();
     render();
+  }
+  let editPress=null,ignoreEditClick=false;
+  const editButton=$('edit-button');
+  editButton.addEventListener('pointerdown',e=>{
+    editPress=null;
+    ignoreEditClick=e.pointerType==='touch'||e.pointerType==='pen';
+    if(!ignoreEditClick||e.isPrimary===false||e.button>0||editButton.disabled)return;
+    editPress={pointerId:e.pointerId,x:e.clientX,y:e.clientY,next:!editing};
+  });
+  editButton.addEventListener('pointermove',e=>{
+    if(editPress?.pointerId===e.pointerId&&Math.hypot(e.clientX-editPress.x,e.clientY-editPress.y)>12)editPress=null;
+  });
+  editButton.addEventListener('pointercancel',()=>{editPress=null;});
+  editButton.addEventListener('pointerup',e=>{
+    const press=editPress;
+    editPress=null;
+    if(!press||press.pointerId!==e.pointerId||editButton.disabled)return;
+    const rect=editButton.getBoundingClientRect();
+    if(Math.hypot(e.clientX-press.x,e.clientY-press.y)>12||e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)return;
+    // Finish on release, even if the browser delays or omits the touch-generated click.
+    e.preventDefault();
+    setEditing(press.next);
+  });
+  editButton.addEventListener('click',e=>{
+    // A touch can still generate click after pointerup; it must not toggle back.
+    const handled=ignoreEditClick&&e.detail!==0;
+    ignoreEditClick=false;
+    editPress=null;
+    if(!handled)setEditing(!editing);
   });
   $('undo-button').addEventListener('click',()=>{
     const c=context();
@@ -998,7 +1029,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-7');
+        const cache=await caches.open('biathlon-field-v6-8');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();
