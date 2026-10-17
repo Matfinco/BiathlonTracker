@@ -275,7 +275,10 @@
     if(id==='session-dialog')fillSession();
     if(id==='history-dialog')fillHistory();
     if(id==='summary-dialog')renderSummary();
-    if(id==='series-dialog')$('series-number').value=currentDraft()?.number||1;
+    if(id==='series-dialog'){
+      clearSeriesNotice();
+      $('series-number').value=currentDraft()?.number||1;
+    }
     $(id).showModal();
   }
   async function confirmAction(title,message,label='Conferma'){
@@ -750,6 +753,18 @@
     editing=false;
     change(s=>D.setContext(s,s.meta.currentAthleteId,s.meta.currentMode,s.meta.currentPos==='T'?'P':'T'));
   });
+  function clearSeriesNotice(){
+    const area=$('series-dialog').querySelector('.dialog-notice');
+    if(!area)return;
+    if($('notice').textContent===area.textContent){
+      $('notice').textContent='';
+      $('notice').hidden=true;
+      $('notice').classList.remove('error');
+    }
+    area.remove();
+  }
+  $('series-number').addEventListener('input',clearSeriesNotice);
+  $('series-dialog').addEventListener('close',clearSeriesNotice);
   $('series-button').addEventListener('click',()=>openDialog('series-dialog'));
   $('series-form').addEventListener('submit',async e=>{
     e.preventDefault();
@@ -1029,7 +1044,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-8');
+        const cache=await caches.open('biathlon-field-v6-9');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();
