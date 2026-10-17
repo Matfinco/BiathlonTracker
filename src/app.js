@@ -2,6 +2,15 @@
   'use strict';
   const D=BiathlonDomain, repo=new BiathlonRepository(), $=id=>document.getElementById(id);
   let state=null,busy=false,review=null,editing=false,selectedShot=0,locked=false,gesture=null,windChoice=null,windTarget=null,wakeLock=null,wakeWanted=false,registration=null,lastSyncError='',confirming=false,installingUpdate=false;
+  let accessCandidate=null,activatingAccess=false,adminBusy=false,adminCoaches=[];
+  function takeInvitation(){
+    const hash=location.hash||'';
+    if(!/^#(?:accesso|gestione)=/.test(hash))return null;
+    // The credential fragment never needs to remain in the address bar or history.
+    window.history.replaceState(null,'',location.href.split('#')[0]);
+    try{return {value:D.invitation(hash)};}catch(error){return {error};}
+  }
+  let receivedInvitation=takeInvitation();
   const arrows={
     C:'Calmo',N:'↑',NE:'↗',E:'→',SE:'↘',S:'↓',SW:'↙',W:'←',NW:'↖'
   };
@@ -214,7 +223,7 @@
     }):'';
     const connection=navigator.onLine?'Rete disponibile':'Senza connessione';
     let message=doing?'Sincronizzazione in corso…':count?`${connection} · ${count} operazioni da inviare`:(last?`Tutto sincronizzato · ${last}`:'Nessuna operazione da inviare');
-    if(count&&(!m.cloudUrl||!m.coachName||!m.apiToken))message=`${count} operazioni da inviare · configura Google, firma e chiave`;
+    if(count&&(!m.cloudUrl||!m.coachName||!m.apiToken))message=`${count} operazioni da inviare · attiva il tuo accesso personale`;
     if(lastSyncError&&navigator.onLine&&count)message=`Invio da riprovare · ${count} operazioni conservate`;
     $('sync-status').textContent=message;
     $('menu-sync-info').textContent=lastSyncError||message;
@@ -248,8 +257,156 @@
   function fillSettings(){
     const m=state.meta;
     for(const [input,key]of [['coach-name','coachName'],['cloud-url','cloudUrl'],['looker-url','lookerUrl'],['api-token','apiToken'],['shot-limit','shotLimit'],['theme-select','theme'],['shot-color-select','shotColor']])$(input).value=m[key]??'';
+    $('access-status').textContent=m.coachName&&m.cloudUrl&&m.apiToken?`Configurato per ${m.coachName}.`:'Apri il collegamento personale ricevuto dall’amministratore, oppure incollalo qui.';
     renderRoster();
   }
+  function offerAccess(candidate){
+    if(activatingAccess)return notify('Attendi il completamento dell’attivazione.');
+    accessCandidate=candidate;
+    const admin=candidate.role==='admin';
+    $('access-title').textContent=admin?'Abilita amministrazione':'Attiva accesso allenatore';
+    $('access-description').textContent=admin?'Potrai gestire e distribuire gli accessi degli allenatori da questo dispositivo. La firma delle tue serie resta quella già configurata.':`Configura questo dispositivo per ${candidate.coachName}. Gli atleti saranno scaricati automaticamente.`;
+    $('access-pending').textContent=admin?'Il collegamento amministratore va conservato soltanto da te.':state.outbox.length?`Sono presenti ${state.outbox.length} operazioni da inviare. Le serie già firmate conservano il proprio allenatore; quelle senza firma useranno ${candidate.coachName}.`:'Sessioni, serie e bozze presenti sul dispositivo saranno conservate.';
+    $('access-error').hidden=true;
+    openDialog('access-dialog');
+  }
+  function adminConfig(){
+    return {cloudUrl:state.meta.adminUrl,apiToken:state.meta.adminToken};
+  }
+  function renderAdmin(){
+    const enabled=Boolean(state.meta.adminToken&&state.meta.adminUrl);
+    $('admin-login').hidden=enabled;
+    $('admin-panel').hidden=!enabled;
+    $('admin-create').disabled=adminBusy;
+    $('admin-refresh').disabled=adminBusy;
+    if(!enabled){$('admin-coaches').replaceChildren();return;}
+    $('admin-coaches').replaceChildren(...(adminCoaches.length?adminCoaches.map(coach=>{
+      const li=node('li'),name=node('h3',coach.name),status=node('p',coach.active?'Accesso attivo':'Accesso revocato',{class:`coach-status${coach.active?'':' revoked'}`});
+      const key=node('p',`Chiave associata: …${coach.keyHint}`,{class:'coach-key'});
+      const actions=node('div',undefined,{class:'coach-actions'});
+      if(coach.active){
+        actions.append(button('Condividi accesso',()=>shareAccess(coach),'primary'));
+        actions.append(button('Mostra chiave',e=>{
+          const shown=key.dataset.shown==='true';
+          key.textContent=shown?`Chiave associata: …${coach.keyHint}`:`Chiave di ${coach.name}: ${coach.token}`;
+          key.dataset.shown=String(!shown);
+          e.currentTarget.textContent=shown?'Mostra chiave':'Nascondi chiave';
+        }));
+      }
+      actions.append(button(coach.active?'Rigenera accesso':'Crea nuovo accesso',async()=>{
+        if(!await confirmAction('Nuovo collegamento',`Generare un nuovo accesso per ${coach.name}? I collegamenti precedenti smetteranno di funzionare. Le serie già raccolte restano sui dispositivi.`,'Genera nuovo accesso'))return;
+        const result=await adminRequest('admin.rotate',{id:coach.id});
+        if(result){const updated=adminCoaches.find(c=>c.id===coach.id);if(updated)shareAccess(updated);}
+      }));
+      if(coach.active)actions.append(button('Revoca accesso',async()=>{
+        if(await confirmAction('Revoca accesso',`Bloccare l’accesso di ${coach.name}? I prossimi invii saranno rifiutati. Le serie già salvate restano conservate.`,'Revoca'))await adminRequest('admin.revoke',{id:coach.id});
+      },'text-button danger-text'));
+      for(const b of actions.children)b.disabled=adminBusy;
+      li.append(name,status,key,actions);
+      return li;
+    }):[node('li','Non ci sono ancora allenatori. Aggiungi il primo qui sopra.')]));
+  }
+  async function adminRequest(action,extra={}){
+    if(adminBusy)return null;
+    if(!navigator.onLine){$('admin-status').textContent='Serve una connessione per gestire gli accessi. La registrazione dei colpi resta disponibile offline.';return null;}
+    adminBusy=true;
+    $('admin-status').textContent='Aggiornamento accessi…';
+    renderAdmin();
+    const config=adminConfig();
+    try{
+      const data=await sync.request(config,{action,...extra});
+      if(state.meta.adminToken!==config.apiToken||state.meta.adminUrl!==config.cloudUrl)throw Error('L’accesso amministratore è cambiato. Riapri la gestione.');
+      if(!Array.isArray(data.coaches))throw Error('Aggiorna il servizio Google per usare la gestione allenatori.');
+      adminCoaches=data.coaches;
+      $('admin-status').textContent=`${adminCoaches.length} allenatori · ${adminCoaches.filter(c=>c.active).length} accessi attivi`;
+      return data;
+    }catch(error){$('admin-status').textContent=error.message;return null;}
+    finally{adminBusy=false;renderAdmin();}
+  }
+  function shareAccess(coach){
+    const link=D.invitationLink({coachName:coach.name,apiToken:coach.token,cloudUrl:state.meta.adminUrl},location.href);
+    $('share-title').textContent=`Accesso di ${coach.name}`;
+    $('share-description').textContent='Invia questo collegamento all’allenatore. Lo apre, conferma l’attivazione e trova l’app già configurata.';
+    $('share-link').value=link;
+    $('share-native').hidden=typeof navigator.share!=='function';
+    openDialog('share-dialog');
+  }
+  $('access-form').addEventListener('submit',e=>{
+    e.preventDefault();
+    const value=$('access-link').value;
+    $('access-link').value='';
+    try{offerAccess(D.invitation(value));}catch(error){showError(error);}
+  });
+  $('admin-login-form').addEventListener('submit',e=>{
+    e.preventDefault();
+    const value=$('admin-link').value;
+    $('admin-link').value='';
+    try{const invite=D.invitation(value);if(invite.role!=='admin')throw Error('Questo è un collegamento allenatore. Per gestire gli accessi serve quello amministratore.');offerAccess(invite);}catch(error){showError(error);}
+  });
+  $('access-dialog').addEventListener('close',()=>{accessCandidate=null;});
+  $('access-activate').addEventListener('click',async()=>{
+    if(!accessCandidate||activatingAccess)return;
+    const candidate=accessCandidate,admin=candidate.role==='admin';
+    activatingAccess=true;
+    $('access-activate').disabled=true;
+    $('access-error').hidden=true;
+    try{
+      if(!navigator.onLine)throw Error('Collegati a Internet per la prima attivazione. Poi potrai registrare i colpi offline.');
+      if(!admin&&state.outbox.length&&state.meta.cloudUrl&&state.meta.cloudUrl!==candidate.cloudUrl)throw Error('Ci sono serie da inviare al servizio precedente. Sincronizzale prima di cambiare destinazione.');
+      const data=await sync.request(candidate,{action:admin?'admin.list':'roster',inserts:[],deletes:[]});
+      if(accessCandidate!==candidate||!$('access-dialog').open)return;
+      if(admin&&!Array.isArray(data.coaches))throw Error('Aggiorna il codice Google Apps Script per abilitare la gestione.');
+      if(!admin&&data.coach!==candidate.coachName)throw Error('La firma del collegamento non corrisponde al servizio. Chiedi un nuovo collegamento all’amministratore.');
+      const roster=admin?null:D.roster(data.roster);
+      const done=await change(s=>{
+        if(admin){s.meta.adminUrl=candidate.cloudUrl;s.meta.adminToken=candidate.apiToken;}
+        else{
+          if(s.meta.syncLease?.until>Date.now())throw Error('Attendi la fine della sincronizzazione e riprova.');
+          if(s.outbox.length&&s.meta.cloudUrl&&s.meta.cloudUrl!==candidate.cloudUrl)throw Error('Sincronizza le serie pendenti prima di cambiare destinazione.');
+          Object.assign(s.meta,{coachName:data.coach,cloudUrl:candidate.cloudUrl,apiToken:candidate.apiToken});
+          D.mergeRoster(s,roster);
+        }
+      });
+      if(!done)return;
+      $('access-dialog').close();
+      if(admin){adminCoaches=data.coaches;openDialog('admin-dialog');$('admin-status').textContent='Gestione abilitata su questo dispositivo.';renderAdmin();}
+      else{fillSettings();notify(`Accesso attivato per ${data.coach}. Scegli i presenti in Nuova sessione.`);sync.schedule();}
+    }catch(error){$('access-error').textContent=error.message;$('access-error').hidden=false;}
+    finally{activatingAccess=false;$('access-activate').disabled=false;}
+  });
+  $('admin-open').addEventListener('click',()=>{
+    openDialog('admin-dialog');renderAdmin();
+    $('admin-status').textContent='';
+    if(state.meta.adminToken)adminRequest('admin.list');
+  });
+  $('admin-refresh').addEventListener('click',()=>adminRequest('admin.list'));
+  $('admin-create-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const name=$('admin-coach-name').value.trim();
+    if(!name)return;
+    if(await adminRequest('admin.create',{name})){
+      $('admin-coach-name').value='';
+      const coach=adminCoaches.find(c=>c.name.toLocaleLowerCase('it')===name.toLocaleLowerCase('it'));
+      if(coach)shareAccess(coach);
+    }
+  });
+  $('admin-logout').addEventListener('click',async()=>{
+    if(!await confirmAction('Disattiva gestione','Rimuovere l’accesso amministratore da questo dispositivo? Gli allenatori mantengono i loro accessi. Per riabilitarlo servirà il tuo collegamento amministratore.','Disattiva'))return;
+    if(await change(s=>{s.meta.adminToken='';s.meta.adminUrl='';})){
+      adminCoaches=[];renderAdmin();$('admin-status').textContent='Accesso amministratore rimosso da questo dispositivo.';
+    }
+  });
+  $('share-copy').addEventListener('click',async()=>{
+    try{
+      if(!navigator.clipboard?.writeText)throw Error('Tieni premuto sul collegamento e scegli Copia.');
+      await navigator.clipboard.writeText($('share-link').value);notify('Collegamento copiato. Puoi incollarlo nel messaggio all’allenatore.');
+    }catch(error){$('share-link').select();showError(error);}
+  });
+  $('share-native').addEventListener('click',async()=>{
+    try{await navigator.share({title:$('share-title').textContent,text:'Apri il collegamento e conferma per configurare Biathlon Tracker.',url:$('share-link').value});}
+    catch(error){if(error.name!=='AbortError')showError(error);}
+  });
+  $('share-back').addEventListener('click',()=>{openDialog('admin-dialog');renderAdmin();});
   function renderRoster(){
     $('roster-list').replaceChildren(...state.meta.roster.map(a=>{
       const li=node('li'),name=node('strong',a.name),remove=button('Rimuovi',async()=>{
@@ -779,7 +936,7 @@
         worker?.addEventListener('statechange',check);
       });
       check();
-      const cache=await caches.open('biathlon-field-v6-2');
+      const cache=await caches.open('biathlon-field-v6-3');
       $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       if(!navigator.serviceWorker.controller)ready.active?.postMessage({
         type:'CLAIM'
@@ -802,6 +959,12 @@
   window.addEventListener('online',()=>{
     if(state)renderSync();
     sync.schedule(3000);
+  });
+  window.addEventListener('hashchange',()=>{
+    const received=takeInvitation();
+    if(!received)return;
+    if(!state){receivedInvitation=received;return;}
+    if(received.error)showError(received.error);else offerAccess(received.value);
   });
   window.addEventListener('offline',()=>{
     sync.stop();
@@ -842,6 +1005,10 @@
       $('app').setAttribute('aria-busy','false');
       $('startup').hidden=true;
       if(!state.meta.roster.length)notify('Apri il menu per aggiungere gli atleti o scaricare l’anagrafica.');
+      if(receivedInvitation){
+        if(receivedInvitation.error)showError(receivedInvitation.error);else offerAccess(receivedInvitation.value);
+        receivedInvitation=null;
+      }
       setupOffline();
       sync.schedule();
       if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{

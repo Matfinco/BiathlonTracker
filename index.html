@@ -195,6 +195,9 @@
     <button data-open="settings-dialog">
      Impostazioni e atleti
     </button>
+    <button id="admin-open">
+     Gestisci allenatori
+    </button>
     <button id="sync-now">
      Sincronizza adesso
     </button>
@@ -227,7 +230,18 @@
     </button>
    </div>
    <div class="dialog-content">
+    <section class="access-card" aria-labelledby="access-status-title">
+     <h3 id="access-status-title">Accesso allenatore</h3>
+     <p id="access-status">Nessun accesso configurato.</p>
+     <form id="access-form">
+      <label for="access-link">Collegamento personale ricevuto</label>
+      <input id="access-link" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui il collegamento" required=""/>
+      <button type="submit">Configura accesso</button>
+     </form>
+    </section>
     <form id="settings-form">
+     <details class="manual-access">
+      <summary>Configurazione manuale dell’accesso</summary>
      <label for="coach-name">
       Firma allenatore
      </label>
@@ -240,6 +254,7 @@
       Chiave personale allenatore
      </label>
      <input autocomplete="off" id="api-token" type="password"/>
+     </details>
      <label for="looker-url">
       Indirizzo statistiche Looker Studio
      </label>
@@ -437,6 +452,64 @@
     </p>
     <div id="summary-list">
     </div>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="access-title" id="access-dialog">
+   <div class="dialog-heading">
+    <h2 id="access-title">Attiva accesso</h2>
+    <button aria-label="Chiudi attivazione" class="icon-button secondary" data-close="">×</button>
+   </div>
+   <div class="dialog-content">
+    <p id="access-description"></p>
+    <p class="helper" id="access-pending"></p>
+    <p id="access-error" class="notice error" role="alert" hidden=""></p>
+    <button id="access-activate">Attiva su questo dispositivo</button>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="admin-title" id="admin-dialog">
+   <div class="dialog-heading">
+    <h2 id="admin-title">Gestione allenatori</h2>
+    <button aria-label="Chiudi gestione allenatori" class="icon-button secondary" data-close="">×</button>
+   </div>
+   <div class="dialog-content">
+    <p id="admin-status" role="status" aria-live="polite"></p>
+    <section id="admin-login">
+     <p>Apri il collegamento amministratore sul tuo dispositivo, oppure incollalo qui.</p>
+     <form id="admin-login-form">
+      <label for="admin-link">Collegamento amministratore</label>
+      <input id="admin-link" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required=""/>
+      <button type="submit">Abilita gestione</button>
+     </form>
+    </section>
+    <section id="admin-panel" hidden="">
+     <form id="admin-create-form">
+      <label for="admin-coach-name">Nuovo allenatore: nome e cognome</label>
+      <input id="admin-coach-name" maxlength="120" autocomplete="off" required=""/>
+      <button id="admin-create" type="submit">Aggiungi allenatore</button>
+     </form>
+     <div class="admin-toolbar">
+      <button class="secondary" id="admin-refresh">Aggiorna elenco</button>
+      <button class="text-button" id="admin-logout">Disattiva gestione su questo dispositivo</button>
+     </div>
+     <ul class="coach-list" id="admin-coaches"></ul>
+    </section>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="share-title" id="share-dialog">
+   <div class="dialog-heading">
+    <h2 id="share-title">Condividi accesso</h2>
+    <button aria-label="Chiudi condivisione" class="icon-button secondary" data-close="">×</button>
+   </div>
+   <div class="dialog-content">
+    <p id="share-description"></p>
+    <label for="share-link">Collegamento personale</label>
+    <input id="share-link" type="text" readonly="" autocomplete="off"/>
+    <p class="helper">Chi riceve questo collegamento può usare l’accesso dell’allenatore indicato.</p>
+    <div class="admin-toolbar">
+     <button id="share-copy">Copia collegamento</button>
+     <button class="secondary" id="share-native">Condividi…</button>
+    </div>
+    <button class="text-button" id="share-back">Torna agli allenatori</button>
    </div>
   </dialog>
   <dialog aria-labelledby="confirm-title" id="confirm-dialog">

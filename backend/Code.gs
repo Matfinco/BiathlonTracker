@@ -13,13 +13,71 @@ function cell_(value){
   return /^[=+@-]/.test(v)?"'"+v:v;
 }
 function authorize_(data){
-  var raw=PropertiesService.getScriptProperties().getProperty('BIATHLON_COACH_KEYS');
-  if(!raw)throw Error('Accesso non ancora configurato: chiedi all’amministratore di creare le chiavi degli allenatori.');
-  var keys=JSON.parse(raw),token=String(data.token||'');
-  if(!token||!Object.prototype.hasOwnProperty.call(keys,token)||!str_(keys[token],120))throw Error('Chiave allenatore non valida o revocata.');
-  return {
-    name:str_(keys[token],120)
-  };
+  var props=PropertiesService.getScriptProperties(),token=String(data.token||'');
+  if(!token||token.length>250)throw Error('Accesso allenatore non valido o revocato.');
+  var records=coachRecords_();
+  for(var i=0;i<records.length;i++){
+    if(records[i].token===token){
+      if(!records[i].active)throw Error('Accesso allenatore revocato. Chiedi un nuovo collegamento all’amministratore.');
+      return {name:records[i].name};
+    }
+  }
+  // Existing personal keys remain valid until the administrator migrates them.
+  var raw=props.getProperty('BIATHLON_COACH_KEYS'),keys=raw?JSON.parse(raw):{};
+  if(Object.prototype.hasOwnProperty.call(keys,token)&&str_(keys[token],120))return {name:str_(keys[token],120)};
+  throw Error('Accesso allenatore non valido o revocato.');
+}
+var BIATHLON_COACH_PREFIX='BIATHLON_COACH_RECORD_';
+function coachRecords_(){
+  var all=PropertiesService.getScriptProperties().getProperties();
+  return Object.keys(all).filter(function(k){return k.indexOf(BIATHLON_COACH_PREFIX)===0;}).map(function(k){return JSON.parse(all[k]);});
+}
+function storeCoach_(record){
+  PropertiesService.getScriptProperties().setProperty(BIATHLON_COACH_PREFIX+record.id,JSON.stringify(record));
+  return record;
+}
+function migrateCoachKeys_(){
+  var props=PropertiesService.getScriptProperties(),raw=props.getProperty('BIATHLON_COACH_KEYS');
+  if(!raw)return;
+  var keys=JSON.parse(raw),records=coachRecords_();
+  Object.keys(keys).forEach(function(token){
+    if(records.some(function(r){return r.token===token;}))return;
+    var name=str_(keys[token],120);
+    if(name)storeCoach_({id:Utilities.getUuid(),name:name,token:token,active:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+  });
+  // Remove the legacy source only after every key has been preserved.
+  props.deleteProperty('BIATHLON_COACH_KEYS');
+}
+function createCoach_(name){
+  name=str_(name,120);
+  if(!name)throw Error('Inserisci nome e cognome dell’allenatore.');
+  if(coachRecords_().some(function(r){return r.name.toLowerCase()===name.toLowerCase();}))throw Error('Allenatore già presente: usa il suo accesso nell’elenco oppure rigeneralo.');
+  var now=new Date().toISOString();
+  return storeCoach_({id:Utilities.getUuid(),name:name,token:Utilities.getUuid()+Utilities.getUuid(),active:true,createdAt:now,updatedAt:now});
+}
+function authorizeAdmin_(data){
+  var expected=PropertiesService.getScriptProperties().getProperty('BIATHLON_ADMIN_TOKEN');
+  if(!expected||String(data.token||'')!==expected)throw Error('Accesso amministratore non valido. Usa il collegamento amministratore generato dal progetto Google.');
+}
+function adminAction_(data){
+  authorizeAdmin_(data);
+  if(['admin.list','admin.create','admin.rotate','admin.revoke'].indexOf(data.action)<0)throw Error('Operazione amministratore non valida.');
+  migrateCoachKeys_();
+  if(data.action==='admin.create')createCoach_(data.name);
+  if(data.action==='admin.rotate'||data.action==='admin.revoke'){
+    var id=identifier_(data.id),record=coachRecords_().filter(function(r){return r.id===id;})[0];
+    if(!record)throw Error('Allenatore non trovato. Aggiorna l’elenco.');
+    if(data.action==='admin.rotate'){
+      record.token=Utilities.getUuid()+Utilities.getUuid();
+      record.active=true;
+    }else record.active=false;
+    record.updatedAt=new Date().toISOString();
+    storeCoach_(record);
+  }
+  var coaches=coachRecords_().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(r){
+    return {id:r.id,name:r.name,active:r.active,createdAt:r.createdAt,updatedAt:r.updatedAt,keyHint:r.token.slice(-8),token:r.active?r.token:''};
+  });
+  return json_({status:'success',protocolVersion:2,coaches:coaches});
 }
 function identifier_(value,optional){
   var v=str_(value);
@@ -105,7 +163,11 @@ function doPost(e){
   var lock=null;
   try{
     if(!e||!e.postData||!e.postData.contents||e.postData.contents.length>2000000)throw Error('Richiesta assente o troppo grande.');
-    var data=JSON.parse(e.postData.contents),authorized=authorize_(data);
+    var data=JSON.parse(e.postData.contents);
+    lock=LockService.getScriptLock();
+    if(!lock.tryLock(15000))throw Error('Archivio occupato. Riprova: le operazioni sono conservate sul dispositivo.');
+    if(typeof data.action==='string'&&data.action.indexOf('admin.')===0)return adminAction_(data);
+    var authorized=authorize_(data);
     var input=data.inserts||[],deletes=data.deletes||[];
     if(!Array.isArray(input)||input.length>100||!Array.isArray(deletes)||deletes.length>500)throw Error('Troppe operazioni nella richiesta.');
     // Validate the entire batch before changing any sheet.
@@ -116,8 +178,6 @@ function doPost(e){
     packets.forEach(function(p){
       if(p.coach!==authorized.name)throw Error('La firma deve corrispondere all’allenatore autorizzato: '+authorized.name);
     });
-    lock=LockService.getScriptLock();
-    if(!lock.tryLock(15000))throw Error('Archivio occupato. Riprova: le operazioni sono conservate sul dispositivo.');
     var ss=spreadsheet_();
     if(data.action==='roster'){
       var listed=roster_(ss);
@@ -235,14 +295,28 @@ function doGet(e){
     if(lock&&lock.hasLock())lock.releaseLock();
   }
 }
-/** Run from the Apps Script editor after setting NUOVO_ALLENATORE in Script Properties. */
-function creaChiaveAllenatore(){
-  var props=PropertiesService.getScriptProperties(),name=str_(props.getProperty('NUOVO_ALLENATORE'),120);
-  if(!name)throw Error('Imposta la proprietà NUOVO_ALLENATORE con nome e cognome.');
-  var keys=JSON.parse(props.getProperty('BIATHLON_COACH_KEYS')||'{}');
-  var token=Utilities.getUuid()+Utilities.getUuid();
-  keys[token]=name;
-  props.setProperty('BIATHLON_COACH_KEYS',JSON.stringify(keys));
-  Logger.log('Allenatore: '+name+'\nChiave personale: '+token+'\nConsegna questa chiave soltanto all’allenatore.');
-  props.deleteProperty('NUOVO_ALLENATORE');
+function onOpen(){
+  SpreadsheetApp.getUi().createMenu('Biathlon').addItem('Apri gestione allenatori','configuraBiathlon').addToUi();
+}
+/** Run once from the bound editor, after publishing the web app. Never called by HTTP handlers. */
+function configuraBiathlon(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  if(!ss)throw Error('Apri questo progetto dal foglio Google: Estensioni → Apps Script.');
+  var props=PropertiesService.getScriptProperties(),id=props.getProperty('BIATHLON_SPREADSHEET_ID');
+  if(id&&id!==ss.getId())throw Error('Il progetto è già configurato per un altro foglio. Verifica BIATHLON_SPREADSHEET_ID.');
+  var serviceUrl=ScriptApp.getService().getUrl();
+  if(!serviceUrl||!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(serviceUrl))throw Error('Pubblica prima il progetto come web app, poi esegui nuovamente configuraBiathlon.');
+  var lock=LockService.getScriptLock();
+  if(!lock.tryLock(15000))throw Error('Archivio occupato. Riprova.');
+  var token;
+  try{
+    props.setProperty('BIATHLON_SPREADSHEET_ID',ss.getId());
+    token=props.getProperty('BIATHLON_ADMIN_TOKEN');
+    if(!token){token=Utilities.getUuid()+Utilities.getUuid();props.setProperty('BIATHLON_ADMIN_TOKEN',token);}
+    migrateCoachKeys_();
+  }finally{lock.releaseLock();}
+  var link='https://matfinco.github.io/BiathlonTracker/#gestione='+encodeURIComponent(JSON.stringify({v:1,url:serviceUrl,token:token}));
+  var safe=link.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  var html='<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font:17px system-ui;padding:18px;line-height:1.5"><p>Apri questo collegamento sul tuo telefono o tablet per abilitare la gestione degli allenatori.</p><p><a target="_blank" rel="noreferrer noopener" href="'+safe+'">Apri l’app come amministratore</a></p><p>Collegamento riservato a te. Nell’app potrai creare quelli personali degli allenatori.</p><input aria-label="Collegamento amministratore" readonly style="width:100%;padding:10px;box-sizing:border-box" value="'+safe+'" onclick="this.select()"></body></html>';
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(480).setHeight(340),'Configura Biathlon');
 }

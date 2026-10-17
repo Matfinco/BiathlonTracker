@@ -149,6 +149,7 @@
       const state=await this.read();
       state.meta.syncLease=null;
       state.meta.apiToken='';
+      state.meta.adminToken='';
       return {
         format:'BiathlonTrackerBackup',exportedAt:new Date().toISOString(),...state
       };

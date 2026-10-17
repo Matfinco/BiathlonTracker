@@ -112,6 +112,25 @@ form>button{
   width:100%;
   margin-top:14px
 }
+.access-card,.coach-list>li{
+  padding:14px;
+  border:2px solid var(--line);
+  border-radius:12px;
+  background:var(--surface)
+}
+.access-card h3{margin-top:0}
+.manual-access{margin:20px 0}
+.manual-access summary{cursor:pointer;padding:16px 0;font-weight:700;min-height:56px}
+.manual-access summary:focus-visible{outline:4px solid var(--focus)}
+.admin-toolbar,.coach-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.admin-toolbar>*{flex:1 1 180px}
+.coach-list{list-style:none;padding:0;display:grid;gap:14px}
+.coach-list h3{margin:0 0 6px}
+.coach-list p{margin:6px 0}
+.coach-status{font-weight:700;color:var(--success)}
+.coach-status.revoked{color:var(--danger)}
+.coach-actions>*{flex:1 1 140px}
+.coach-key{overflow-wrap:anywhere;user-select:all}
 [hidden]{
   display:none!important
 }.secondary{

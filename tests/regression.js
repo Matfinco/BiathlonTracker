@@ -441,6 +441,7 @@
     };
     properties={
       BIATHLON_SPREADSHEET_ID:'test-sheet-id',
+      BIATHLON_ADMIN_TOKEN:'admin-test-token-that-is-private',
       BIATHLON_COACH_KEYS:JSON.stringify({
         'coach-token':'Coach','other-token':'Other Coach'
       })
@@ -462,11 +463,14 @@
     };
     globalThis.PropertiesService={
       getScriptProperties:()=>({
-        getProperty:k=>properties[k]||null
+        getProperty:k=>properties[k]||null,
+        getProperties:()=>({...properties}),
+        setProperty(k,v){properties[k]=String(v);return this;},
+        deleteProperty(k){delete properties[k];return this;}
       })
     };
     globalThis.Utilities={
-      getUuid:D.uid
+      getUuid:()=>`00000000-0000-4000-8000-${String(++globalThis.__uuid).padStart(12,'0')}`
     };
     globalThis.ContentService={
       MimeType:{
@@ -521,6 +525,74 @@
     equal(sheets.Database.getLastRow(),2);
     equal(sheets.Database.grid[1][11],'Errore');
     equal(sheets.Database.grid[0].slice(0,15),BIATHLON_HEADERS.slice(0,15));
+  });
+  const admin=(action,extra={})=>post({token:'admin-test-token-that-is-private',action,...extra});
+  await test('Coach and unauthenticated requests cannot list or manage personal accesses',()=>{
+    server();
+    for(const action of ['admin.list','admin.create','admin.rotate','admin.revoke']){
+      equal(post({action,name:'Intruder'}).status,'error');
+      equal(post({action,token:'',name:'Intruder'}).status,'error');
+    }
+    assert(properties.BIATHLON_COACH_KEYS);
+    equal(coachRecords_().length,0);
+    equal(post({action:'roster',token:properties.BIATHLON_ADMIN_TOKEN}).status,'error');
+  });
+  await test('Admin migration preserves every legacy key and its coach without duplicate imports',()=>{
+    server();
+    const result=admin('admin.list');
+    equal(result.status,'success');
+    equal(result.coaches.length,2);
+    equal(result.coaches.find(c=>c.name==='Coach').token,'coach-token');
+    assert(!properties.BIATHLON_COACH_KEYS);
+    equal(admin('admin.list').coaches.length,2);
+    equal(post({action:'roster'}).status,'success');
+  });
+  await test('Admin creates a named access; its personal link configures the matching coach',()=>{
+    server();
+    const result=admin('admin.create',{name:'Allenatore Neve'});
+    equal(result.status,'success');
+    const coach=result.coaches.find(c=>c.name==='Allenatore Neve');
+    assert(coach.active);
+    const url='https://script.google.com/macros/s/test-deployment/exec';
+    const link=D.invitationLink({coachName:coach.name,apiToken:coach.token,cloudUrl:url},'https://example.test/BiathlonTracker/');
+    const config=D.invitation(link);
+    equal(config.coachName,coach.name);
+    equal(config.apiToken,coach.token);
+    equal(post({action:'roster',token:config.apiToken}).coach,coach.name);
+    equal(admin('admin.create',{name:'allenatore neve'}).status,'error');
+  });
+  await test('Revocation blocks old links; rotation reactivates only the new credential',()=>{
+    server();
+    let coach=admin('admin.create',{name:'Coach New'}).coaches.find(c=>c.name==='Coach New');
+    const oldToken=coach.token;
+    equal(post({action:'roster',token:oldToken}).status,'success');
+    coach=admin('admin.revoke',{id:coach.id}).coaches.find(c=>c.id===coach.id);
+    assert(!coach.active);
+    equal(coach.token,'');
+    equal(post({action:'roster',token:oldToken}).status,'error');
+    coach=admin('admin.rotate',{id:coach.id}).coaches.find(c=>c.id===coach.id);
+    assert(coach.active&&coach.token!==oldToken);
+    equal(post({action:'roster',token:coach.token}).status,'success');
+    equal(post({action:'roster',token:oldToken}).status,'error');
+    equal(post({action:'roster'}).status,'success');
+  });
+  await test('Migration retries preserve revocation and never restore a revoked legacy key',()=>{
+    server();
+    const coach=admin('admin.list').coaches.find(c=>c.name==='Coach');
+    admin('admin.revoke',{id:coach.id});
+    properties.BIATHLON_COACH_KEYS=JSON.stringify({'coach-token':'Coach'});
+    admin('admin.list');
+    equal(post({action:'roster'}).status,'error');
+    equal(coachRecords_().filter(c=>c.token==='coach-token').length,1);
+  });
+  await test('Malformed invitation links cannot redirect credentials to another host',()=>{
+    const make=(url,extra={})=>'#accesso='+encodeURIComponent(JSON.stringify({v:1,name:'Coach',token:'personal-test-token',url,...extra}));
+    const good='https://script.google.com/macros/s/deployment/exec';
+    equal(D.invitation(make(good)).role,'coach');
+    for(const url of ['https://evil.example/exec','http://script.google.com/macros/s/deployment/exec',good+'?other=1','https://script.google.com.evil.example/macros/s/deployment/exec'])throws(()=>D.invitation(make(url)));
+    throws(()=>D.invitation(make(good,{v:999})));
+    throws(()=>D.invitation('#accesso=broken%'));
+    equal(D.invitation('#gestione='+encodeURIComponent(JSON.stringify({v:1,url:good,token:'private-admin-token'}))).role,'admin');
   });
   await test('Server tombstone prevents delayed inserts from resurrecting deleted series',()=>{
     server();

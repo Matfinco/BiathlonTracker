@@ -18,6 +18,27 @@
     if (u.protocol !== 'https:') throw Error('Usa un indirizzo HTTPS valido.');
     return u.href;
   };
+  function invitation(value) {
+    try {
+      const raw=text(value);
+      if(raw.length>8192)throw Error();
+      const hash=raw.slice(raw.indexOf('#'));
+      const admin=hash.startsWith('#gestione=');
+      if(!admin&&!hash.startsWith('#accesso='))throw Error();
+      const data=JSON.parse(decodeURIComponent(hash.slice(hash.indexOf('=')+1)));
+      if(data.v!==1||(!admin&&typeof data.name!=='string')||typeof data.token!=='string'||typeof data.url!=='string')throw Error();
+      const coachName=admin?'':text(data.name),apiToken=text(data.token),cloudUrl=validUrl(data.url);
+      if((!admin&&(!coachName||coachName.length>120))||apiToken.length<16||apiToken.length>250||!/^[A-Za-z0-9_-]+$/.test(apiToken))throw Error();
+      if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(cloudUrl))throw Error();
+      return {role:admin?'admin':'coach',coachName,apiToken,cloudUrl};
+    } catch(error) {
+      throw Error('Collegamento personale non valido. Chiedi all’amministratore di copiarlo nuovamente.');
+    }
+  }
+  function invitationLink(config,appUrl) {
+    const base=validUrl(appUrl).split(/[?#]/)[0];
+    return base+'#accesso='+encodeURIComponent(JSON.stringify({v:1,name:config.coachName,token:config.apiToken,url:config.cloudUrl}));
+  }
   function limit(value) {
     const n = Number(value);
     if (!Number.isInteger(n) || n < 1 || n > 50) throw Error('Il limite deve essere un numero intero da 1 a 50.');
@@ -51,7 +72,7 @@
     const sessionId = uid(), startedAt = new Date().toISOString();
     return {
       meta: {
-        schemaVersion: VERSION, revision: 0, coachName: '', cloudUrl: '', lookerUrl: '', apiToken: '', theme: 'day', shotColor: 'color', shotLimit: 5, roster: [], activeIds: [], currentAthleteId: '', currentPos: 'T', currentMode: 'Azzeramento', currentWind: {
+        schemaVersion: VERSION, revision: 0, coachName: '', cloudUrl: '', lookerUrl: '', apiToken: '', adminUrl: '', adminToken: '', theme: 'day', shotColor: 'color', shotLimit: 5, roster: [], activeIds: [], currentAthleteId: '', currentPos: 'T', currentMode: 'Azzeramento', currentWind: {
           dir:'C',int:0
         }, sessionId, lastActivity: Date.now(), counters: {
         }, drafts: {
@@ -300,6 +321,6 @@
     return s;
   }
   root.BiathlonDomain={
-    MODES,VERSION,clone,uid,id,validUrl,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,packet,enqueue,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
+    MODES,VERSION,clone,uid,id,validUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,packet,enqueue,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
   };
 })(globalThis);
