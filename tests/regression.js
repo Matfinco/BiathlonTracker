@@ -47,6 +47,10 @@
     const d=D.draft(s);
     return D.saveSeries(s,d.key,d.version);
   }
+  function moveSeries(s,mode,position=s.meta.currentPos,destinationVersion){
+    const d=D.draft(s);
+    return D.changeSeriesContext(s,mode,position,d.key,d.version,destinationVersion);
+  }
   function repoFor(s){
     return {
       snapshot:s,async mutate(fn){
@@ -98,7 +102,7 @@
     equal(D.draft(s).shots.length,5);
     equal(save(s).shots.length,5);
   });
-  await test('Different athletes, positions and modes keep separate drafts',()=>{
+  await test('Switching athletes keeps their unfinished series separate',()=>{
     const s=setup();
     add(s,230,220);
     D.setContext(s,'2','Gara','P');
@@ -181,6 +185,91 @@
     equal(D.draft(s).number,1);
     D.startSession(s,['1']);
     equal(D.draft(s).number,1);
+  });
+  await test('Changing training and position carries every shot and wind without advancing category counters',()=>{
+    const s=setup();
+    for(let i=0;i<2;i++){add(s);save(s);}
+    D.setContext(s,'1','i1-i2','T');
+    for(let i=0;i<3;i++){add(s);save(s);}
+    D.setContext(s,'1','Azzeramento','T');
+    add(s,300,220);add(s,230,220);
+    const source=D.clone(D.draft(s));
+    D.draft(s).wind={dir:'NE',int:3};
+    const counters=D.clone(s.meta.counters),queue=D.clone(s.outbox);
+    moveSeries(s,'i1-i2');
+    equal(D.draft(s).number,4);
+    equal(D.draft(s).shots,source.shots);
+    assert(!s.meta.drafts[source.key]);
+    moveSeries(s,'i1-i2','P');
+    equal(D.draft(s).number,1);
+    equal(D.draft(s).shots.map(p=>[p.x,p.y]),source.shots.map(p=>[p.x,p.y]));
+    equal(D.draft(s).shots.map(p=>p.esito),['Bersaglio','Bersaglio']);
+    moveSeries(s,'Azzeramento','T');
+    equal(D.draft(s).number,3);
+    equal(D.draft(s).shots,source.shots);
+    equal(D.draft(s).wind,{dir:'NE',int:3});
+    equal(Object.values(s.meta.drafts).filter(d=>d.shots.length).length,1);
+    equal(s.meta.counters,counters);equal(s.outbox,queue);
+    equal(save(s).series,'3T');
+    moveSeries(s,'i1-i2','T');
+    equal(D.draft(s).number,4);
+  });
+  await test('Moving an archived correction keeps the original until save and restores its number on return',()=>{
+    const s=setup();add(s,300,220);
+    const original=save(s);
+    D.setContext(s,'1','i3','P');
+    for(let i=0;i<3;i++){add(s);save(s);}
+    D.editSeries(s,original.id);
+    const records=D.clone(s.series),queue=D.clone(s.outbox);
+    moveSeries(s,'i3','P');
+    equal(D.draft(s).number,4);equal(D.draft(s).replacesId,original.id);
+    equal(D.draft(s).shots[0].esito,'Bersaglio');
+    equal(s.series,records);equal(s.outbox,queue);
+    moveSeries(s,'Azzeramento','T');equal(D.draft(s).number,1);
+    moveSeries(s,'i3','P');
+    const replacement=save(s);
+    equal(replacement.type,'i3');equal(replacement.series,'4P');
+    equal(replacement.timestamp,original.timestamp);
+    assert(!s.series.some(r=>r.id===original.id));
+    assert(s.outbox.some(op=>op.kind==='delete'&&op.seriesId===original.id));
+    equal(s.meta.counters[D.counterKey('1','Azzeramento','T',s.meta.sessionId)],2);
+    equal(D.draft(s).number,5);
+  });
+  await test('Occupied destinations require confirmation of the exact draft and preserve both sets of shots',()=>{
+    const s=setup();
+    D.setContext(s,'1','i3','T');add(s,210,220);add(s,220,220);
+    const destination=D.clone(D.draft(s));
+    D.setContext(s,'1','Azzeramento','T');add(s,300,220);
+    const source=D.clone(D.draft(s)),before=D.clone(s);
+    throws(()=>moveSeries(s,'i3'));equal(s,before);
+    throws(()=>moveSeries(s,'i3','T',destination.version+1));equal(s,before);
+    moveSeries(s,'i3','T',destination.version);
+    equal(s.series.length,1);equal(s.series[0].shots,destination.shots);
+    equal(s.series[0].series,'1T');equal(s.series[0].type,'i3');
+    equal(D.draft(s).number,2);equal(D.draft(s).shots,source.shots);
+    assert(!s.meta.drafts[source.key]);
+  });
+  await test('A confirmed empty destination correction keeps its archived original when current shots move in',()=>{
+    const s=setup();D.setContext(s,'1','i3','T');add(s);
+    const original=save(s);D.editSeries(s,original.id);
+    const destination=D.draft(s);destination.shots=[];destination.version++;
+    D.setContext(s,'1','Azzeramento','T');add(s,300,220);
+    const records=D.clone(s.series),queue=D.clone(s.outbox);
+    throws(()=>moveSeries(s,'i3'));
+    moveSeries(s,'i3','T',destination.version);
+    equal(s.series,records);equal(s.outbox,queue);
+    equal(D.draft(s).number,2);equal(D.draft(s).replacesId,null);
+    equal(D.draft(s).shots[0].x,300);
+  });
+  await test('Moving away and back rejects stale gestures and retains shots above a newly lowered limit',()=>{
+    const s=setup();add(s);add(s,240,220);
+    const old=D.clone(D.draft(s));s.meta.shotLimit=1;
+    moveSeries(s,'i4','P');moveSeries(s,'Azzeramento','T');
+    equal(D.draft(s).shots,old.shots);
+    assert(D.draft(s).version>old.version);
+    const before=D.clone(s);
+    throws(()=>D.changeSeriesContext(s,'i5','P',old.key,old.version));
+    equal(s,before);
   });
   await test('Legacy migration preserves pixel coordinates, queues and ID types',()=>{
     const old={

@@ -5,7 +5,8 @@ App per smartphone e tablet per registrare i colpi al poligono, conservare le se
 ## Utilizzo sul campo
 
 - Bersaglio a tutta larghezza, senza margini laterali, colonne o limite massimo di larghezza. Le proporzioni 400 × 440 rimangono costanti, anche in orizzontale; si può scorrere verticalmente.
-- Atleta, Terra/Piedi, tipo di allenamento e numero della serie sempre visibili. Bozze indipendenti per sessione, atleta, modalità e posizione.
+- Atleta, Terra/Piedi, tipo di allenamento e numero della serie sempre visibili. Cambiare allenamento o Terra/Piedi sposta la serie in corso con tutti i colpi e il vento; i centri sono ricalcolati per la nuova posizione. Il numero segue il progressivo della destinazione, separato per sessione, atleta, allenamento e posizione, e avanza solo al salvataggio. Le serie in corso di atleti diversi restano separate.
+- Se nella destinazione esiste già una vecchia serie incompleta, l’app propone di salvarla prima dello spostamento. Annullare lascia entrambe le serie come sono. Le correzioni dello storico sostituiscono l’originale soltanto quando vengono salvate, anche dopo un cambio di allenamento o posizione.
 - Tipi di allenamento: Azzeramento, Tiro da fermo, i1-i2, i3, i4, i5, Gara, Altro. Le serie e le bozze precedenti mantengono la categoria originale e restano modificabili; le nuove scelte usano le categorie aggiornate.
 - Cinque colpi iniziali; limite modificabile da **1 a 50** nelle impostazioni. Abbassarlo non elimina colpi già presenti.
 - Tocco per inserire, anche nello stesso punto di un colpo precedente. “Modifica colpi” permette di scegliere il numero e spostare il colpo, con vista ingrandita; “Annulla colpo” rimuove l’ultimo.

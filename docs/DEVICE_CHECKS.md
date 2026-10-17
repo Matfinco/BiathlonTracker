@@ -10,6 +10,7 @@ Da svolgere prima dell’uso in allenamento. Le prove automatiche usano API simu
 - Provare l’interfaccia chiara al sole, con colpi a colori e in bianco e nero. Leggere nome atleta, posizione, modalità e serie senza avvicinare il dispositivo.
 - Con i guanti effettivamente usati: inserire dieci serie, correggere colpi e scegliere il vento. La compatibilità del guanto e la risposta con schermo bagnato dipendono anche dal dispositivo.
 - Due colpi nello stesso punto devono restare due. In Modifica selezionare un numero e provare tocco e trascinamento con vista ingrandita.
+- Inserire colpi in Azzeramento, passare a i1-i2 e poi da Terra a Piedi: tutti i colpi devono restare nelle stesse coordinate, con centri ricalcolati e il progressivo della destinazione. Tornare indietro prima del salvataggio non deve lasciare copie della serie. Se esiste una vecchia serie incompleta nella destinazione, provare sia “Annulla” sia “Salva e sposta”.
 - Dopo aver spostato un colpo, toccare una sola volta “Fine modifica”: la selezione e la lente devono sparire e il comando deve diventare “Modifica colpi”, senza riattivarsi. Ripetere con un tocco rapido subito dopo il trascinamento; scorrere sul pulsante o annullare il tocco non deve attivarlo.
 - Un gesto di scorrimento, un contatto annullato o un secondo dito non devono aggiungere colpi.
 

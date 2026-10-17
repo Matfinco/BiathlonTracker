@@ -134,6 +134,50 @@
     });
     draft(state);
   }
+  function changeSeriesContext(state, mode, position, expectedKey, expectedVersion, resolveDestinationVersion) {
+    if (!STORED_MODES.includes(mode) || !['T','P'].includes(position)) throw Error('Posizione o modalità non valida.');
+    const m=state.meta,source=draft(state,false);
+    if(!source){
+      if(expectedKey!==undefined)throw Error('La serie è cambiata in un’altra scheda. Controlla il bersaglio e riprova.');
+      setContext(state,m.currentAthleteId,mode,position);
+      return draft(state,false);
+    }
+    const current=checkedDraft(state,expectedKey,expectedVersion);
+    if(current.mode===mode&&current.position===position)return current;
+    const destinationKey=key({...m,currentMode:mode,currentPos:position});
+    let destination=m.drafts[destinationKey];
+    const moving=current.shots.length>0||Boolean(current.replacesId);
+    const occupied=destination&&(destination.shots.length>0||destination.replacesId);
+    if(resolveDestinationVersion!==undefined&&(!destination||destination.version!==resolveDestinationVersion))throw Error('La serie di destinazione è cambiata. Riprova il cambio di allenamento o posizione.');
+    if(moving&&occupied){
+      if(resolveDestinationVersion===undefined)throw Error('Nella destinazione c’è già una serie incompleta. Conferma come conservarla prima di spostare i colpi.');
+    }
+    if(!moving){
+      setContext(state,m.currentAthleteId,mode,position);
+      delete m.drafts[current.key];
+      return draft(state);
+    }
+    if(occupied){
+      // Resolve only the exact draft confirmed in the UI. An empty correction
+      // can be cancelled while preserving its archived original.
+      if(destination.shots.length){
+        setContext(state,m.currentAthleteId,mode,position);
+        saveSeries(state,destination.key,destination.version);
+      }else delete m.drafts[destinationKey];
+    }
+    const original=current.replacesId?state.series.find(r=>r.id===current.replacesId):null;
+    setContext(state,m.currentAthleteId,mode,position);
+    destination=draft(state);
+    const previous=state.series.filter(r=>r.sessionId===current.sessionId&&r.athleteId===current.athleteId&&r.type===mode&&r.position===position).map(r=>r.number||parseInt(r.series,10)||1);
+    const number=original?.type===mode&&original.position===position
+      ? original.number||parseInt(original.series,10)||1
+      : Math.max(destination.number,m.counters[counterKey(current.athleteId,mode,position,current.sessionId)]||1,...previous.map(n=>n+1));
+    const moved={...current,key:destinationKey,mode,position,number,shots:shots(current.shots,position),version:Math.max(current.version,destination.version)+1};
+    delete m.drafts[current.key];
+    m.drafts[destinationKey]=moved;
+    m.lastActivity=Date.now();
+    return moved;
+  }
   function packet(record) {
     return {
       id:record.id, sessionId:record.sessionId, athleteId:record.athleteId, type:record.type, timestamp:record.timestamp, localDate:record.localDate, coach:record.coach, athlete:record.athlete, position:record.position, series:record.series, windDir:record.windDir, windInt:record.windInt, shots:record.shots.map(s=>shot(s.x,s.y,record.position,s.seq))
@@ -330,6 +374,6 @@
     return s;
   }
   root.BiathlonDomain={
-    MODES,VERSION,clone,uid,id,validUrl,syncUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,packet,enqueue,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
+    MODES,VERSION,clone,uid,id,validUrl,syncUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,changeSeriesContext,packet,enqueue,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
   };
 })(globalThis);

@@ -196,6 +196,51 @@
     await flush();
     assert(element('shot-count').textContent==='1 / 5 colpi');
   });
+  await test('Changing training or position in the UI moves current shots and selects the destination sequence',async()=>{
+    await tap();await element('save-button').click();await flush();
+    await tap(292.5,214.5);await tap();
+    const originalKey=BiathlonDomain.draft(__uiRepo.snapshot).key;
+    element('mode-select').value='i1-i2';await element('mode-select').emit('change');await flush();
+    assert(element('shot-count').textContent==='2 / 5 colpi');
+    assert(element('series-button').textContent==='Serie 1');
+    assert(!__uiRepo.snapshot.meta.drafts[originalKey]);
+    assert(element('hit-count').textContent==='1 centro');
+    await element('position-button').click();await flush();
+    assert(element('position-button').textContent==='Piedi');
+    assert(element('hit-count').textContent==='2 centri');
+    element('mode-select').value='Azzeramento';await element('mode-select').emit('change');await flush();
+    await element('position-button').click();await flush();
+    assert(element('series-button').textContent==='Serie 2');
+    assert(element('hit-count').textContent==='1 centro');
+    assert(Object.values(__uiRepo.snapshot.meta.drafts).filter(d=>d.shots.length).length===1);
+    await element('save-button').click();await flush();
+    const saved=__uiRepo.snapshot.series.at(-1);
+    assert(saved.type==='Azzeramento'&&saved.position==='T'&&saved.series==='2T'&&saved.shots.length===2);
+  });
+  await test('An occupied category can be cancelled or saved before moving, and a failed write preserves both series',async()=>{
+    const D=BiathlonDomain,s=__uiRepo.snapshot;
+    D.setContext(s,'1','i3','T');let d=D.draft(s);D.addShot(s,230,220,d.key,d.version);
+    D.setContext(s,'1','Azzeramento','T');await __uiRepo.onchange();await flush();await tap(292.5,214.5);
+    const before=JSON.stringify(__uiRepo.snapshot);
+    async function chooseDestination(){
+      element('mode-select').value='i3';
+      const pending=element('mode-select').emit('change');await flush();
+      assert(element('confirm-dialog').open);
+      assert(element('mode-select').value==='Azzeramento');
+      return {pending};
+    }
+    let action=await chooseDestination();element('confirm-dialog').close('cancel');await action.pending;await flush();
+    assert(JSON.stringify(__uiRepo.snapshot)===before);
+    action=await chooseDestination();__uiRepo.failNext=true;
+    element('confirm-dialog').close('accept');await action.pending;await flush();
+    assert(JSON.stringify(__uiRepo.snapshot)===before,'Failed move lost a draft');
+    assert(element('storage-status').classList.contains('error'));
+    action=await chooseDestination();element('confirm-dialog').close('accept');await action.pending;await flush();
+    assert(element('mode-select').value==='i3');
+    assert(__uiRepo.snapshot.series[0].type==='i3'&&__uiRepo.snapshot.series[0].shots[0].x===230);
+    assert(D.draft(__uiRepo.snapshot).number===2&&D.draft(__uiRepo.snapshot).shots[0].x===300);
+    assert(Object.values(__uiRepo.snapshot.meta.drafts).filter(d=>d.shots.length).length===1);
+  });
   await test('UI failed disk write preserves draft and displays a saving error',async()=>{
     await tap();
     __uiRepo.failNext=true;

@@ -753,14 +753,30 @@
     editing=false;
     change(s=>D.setContext(s,value,s.meta.currentMode,s.meta.currentPos),'Atleta selezionato. Le altre bozze sono conservate.');
   });
-  $('mode-select').addEventListener('change',e=>{
-    const value=e.target.value;
+  async function changeCurrentSeriesContext(mode,position){
+    const c=context(),source=currentDraft();
     editing=false;
-    change(s=>D.setContext(s,s.meta.currentAthleteId,value,s.meta.currentPos));
+    resetGesture();
+    render();
+    if(busy||locked||review||confirming)return;
+    const destination=state.meta.drafts[D.key({...state.meta,currentMode:mode,currentPos:position})];
+    let resolveDestinationVersion;
+    if(source&&source.key!==destination?.key&&(source.shots.length||source.replacesId)&&destination&&(destination.shots.length||destination.replacesId)){
+      const targetLabel=`${mode} · ${position==='T'?'Terra':'Piedi'} · Serie ${destination.number}`;
+      const message=destination.shots.length
+        ? `In ${targetLabel} ci sono già ${destination.shots.length} colpi. Salvare quella serie e spostare qui la serie corrente con i suoi ${source.shots.length} colpi?`
+        : `In ${targetLabel} è aperta una correzione senza colpi. Annullare quella correzione, conservando l’originale nello storico, e spostare qui la serie corrente?`;
+      if(!await confirmAction('Serie già iniziata',message,destination.shots.length?'Salva e sposta':'Sposta i colpi'))return;
+      resolveDestinationVersion=destination.version;
+    }
+    const done=await change(s=>D.changeSeriesContext(s,mode,position,c.key,c.version,resolveDestinationVersion));
+    if(done&&resolveDestinationVersion!==undefined)sync.schedule();
+  }
+  $('mode-select').addEventListener('change',e=>{
+    return changeCurrentSeriesContext(e.target.value,state.meta.currentPos);
   });
   $('position-button').addEventListener('click',()=>{
-    editing=false;
-    change(s=>D.setContext(s,s.meta.currentAthleteId,s.meta.currentMode,s.meta.currentPos==='T'?'P':'T'));
+    return changeCurrentSeriesContext(state.meta.currentMode,state.meta.currentPos==='T'?'P':'T');
   });
   function clearSeriesNotice(){
     const area=$('series-dialog').querySelector('.dialog-notice');
@@ -1053,7 +1069,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-10');
+        const cache=await caches.open('biathlon-field-v6-11');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();
