@@ -1,16 +1,29 @@
 (function(){
   'use strict';
   const D=BiathlonDomain, repo=new BiathlonRepository(), $=id=>document.getElementById(id);
-  let state=null,busy=false,review=null,editing=false,selectedShot=0,locked=false,gesture=null,windChoice=null,windTarget=null,wakeLock=null,wakeWanted=false,registration=null,lastSyncError='',confirming=false,installingUpdate=false;
+  let state=null,busy=false,review=null,editing=false,selectedShot=0,locked=false,gesture=null,windChoice=null,windTarget=null,wakeLock=null,wakeWanted=false,lastSyncError='',confirming=false;
   let accessCandidate=null,activatingAccess=false,adminBusy=false,adminCoaches=[];
+  const pendingAccessKey='biathlon-update-pending-access';
   function takeInvitation(){
     const hash=location.hash||'';
     if(!/^#(?:accesso|gestione)=/.test(hash))return null;
     // The credential fragment never needs to remain in the address bar or history.
     window.history.replaceState(null,'',location.href.split('#')[0]);
-    try{return {value:D.invitation(hash)};}catch(error){return {error};}
+    try{return {value:D.invitation(hash),fragment:hash};}catch(error){return {error};}
   }
-  let receivedInvitation=takeInvitation();
+  function restoreInvitation(){
+    try{
+      const raw=sessionStorage.getItem(pendingAccessKey);
+      sessionStorage.removeItem(pendingAccessKey);
+      if(!raw)return null;
+      const saved=JSON.parse(raw);
+      if(typeof saved.fragment!=='string'||!Number.isFinite(saved.at)||Date.now()-saved.at<0||Date.now()-saved.at>300000)return null;
+      return {value:D.invitation(saved.fragment),fragment:saved.fragment};
+    }catch(error){return null;}
+  }
+  const linkInvitation=takeInvitation();
+  let receivedInvitation=restoreInvitation();
+  if(linkInvitation)receivedInvitation=linkInvitation;
   const arrows={
     C:'Calmo',N:'↑',NE:'↗',E:'→',SE:'↘',S:'↓',SW:'↙',W:'←',NW:'↖'
   };
@@ -20,6 +33,27 @@
       if(info.status==='success')lastSyncError='';
       $('sync-status').dataset.state=info.status;
       refresh().catch(showError);
+    }
+  });
+  const updates=new BiathlonUpdates({
+    beforeActivate:async()=>{
+      if(receivedInvitation?.fragment){
+        try{sessionStorage.setItem(pendingAccessKey,JSON.stringify({fragment:receivedInvitation.fragment,at:Date.now()}));}
+        catch(error){throw Error('Conferma prima il collegamento personale, poi aggiorna l’app dal menu.');}
+      }
+      sync.stop();
+      $('app').inert=true;
+      for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
+      $('startup-message').textContent='Aggiornamento dell’app… I dati sul dispositivo saranno conservati.';
+      $('startup').hidden=false;
+      await repo.queue;
+    },
+    onAvailable:available=>{$('update-button').hidden=!available;},
+    onFailure:message=>{
+      try{sessionStorage.removeItem(pendingAccessKey);}catch(error){}
+      $('app').inert=false;
+      $('startup').hidden=true;
+      notify(message,true);
     }
   });
   function node(tag,content,attrs={
@@ -953,38 +987,28 @@
   async function setupOffline(){
     if(!('serviceWorker'in navigator)){
       $('offline-ready').textContent='Questo browser non supporta il caricamento offline. Usa un browser aggiornato.';
-      return;
+      return false;
     }
     try{
-      registration=await navigator.serviceWorker.register('sw.js');
-      const ready=await navigator.serviceWorker.ready;
-      const check=()=>{
-        if(registration.waiting)$('update-button').hidden=false;
+      if(await updates.start())return true;
+      const checkReady=async()=>{
+        const cache=await caches.open('biathlon-field-v6-6');
+        $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
-      registration.addEventListener('updatefound',()=>{
-        const worker=registration.installing;
-        worker?.addEventListener('statechange',check);
-      });
-      check();
-      const cache=await caches.open('biathlon-field-v6-5');
-      $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
-      if(!navigator.serviceWorker.controller)ready.active?.postMessage({
-        type:'CLAIM'
-      });
+      await checkReady();
+      navigator.serviceWorker.ready.then(ready=>{
+        if(!navigator.serviceWorker.controller)ready.active?.postMessage({type:'CLAIM'});
+        return checkReady();
+      }).catch(()=>{});
     }catch(error){
       $('offline-ready').textContent='Preparazione offline non riuscita. Riapri l’app con una connessione prima di usarla senza rete.';
     }
+    return false;
   }
   $('update-button').addEventListener('click',async()=>{
+    if(!updates.registration?.waiting)return;
     if(!await confirmAction('Aggiorna app','Installare l’aggiornamento e riaprire l’app? Serie e bozze già salvate rimarranno sul dispositivo.','Aggiorna'))return;
-    await repo.queue;
-    installingUpdate=true;
-    registration?.waiting?.postMessage({
-      type:'ACTIVATE'
-    });
-  });
-  navigator.serviceWorker?.addEventListener('controllerchange',()=>{
-    if(installingUpdate)location.reload();
+    await updates.activate();
   });
   window.addEventListener('online',()=>{
     if(state)renderSync();
@@ -1031,6 +1055,8 @@
       const initialized=await repo.mutate(s=>D.draft(s));
       state=initialized.state;
       render();
+      $('startup-message').textContent=navigator.onLine?'Verifica aggiornamenti…':'Apertura dell’app senza connessione…';
+      if(await setupOffline())return;
       $('app').inert=false;
       $('app').setAttribute('aria-busy','false');
       $('startup').hidden=true;
@@ -1039,7 +1065,6 @@
         if(receivedInvitation.error)showError(receivedInvitation.error);else offerAccess(receivedInvitation.value);
         receivedInvitation=null;
       }
-      setupOffline();
       sync.schedule();
       if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{
       });

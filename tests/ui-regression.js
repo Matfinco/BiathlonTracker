@@ -15,9 +15,9 @@
     await flush();
     if(element('edit-button').getAttribute('aria-pressed')==='true')await element('edit-button').click();
   }
-  async function test(name,fn){
+  async function test(name,fn,resetBefore=true){
     try{
-      await reset();
+      if(resetBefore)await reset();
       await fn();
       testResults.push({
         name,ok:true
@@ -46,6 +46,13 @@
   await flush();
   assert(element('startup').hidden,'Application did not start');
   assert(!element('app').inert,'Application still inert');
+  await test('A personal invite survives an update reload and still requires explicit activation',()=>{
+    assert(element('access-dialog').open);
+    assert(element('access-description').textContent.includes('Coach Invito'));
+    assert(!__uiRepo.snapshot.meta.apiToken);
+    assert(!__uiSession.has('biathlon-update-pending-access'),'Pending credential was not removed after recovery');
+    assert(!location.href.includes('pending-personal-test-token'));
+  },false);
   await test('UI starts with 5-shot limit and explicit athlete/context',async()=>{
     assert(element('shot-count').textContent==='0 / 5 colpi');
     assert(element('athlete-select').value==='1');

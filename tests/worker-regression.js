@@ -15,7 +15,7 @@
     }
   }
   const listeners={
-  },contents=new Map(),deleted=[],added=[];
+  },contents=new Map(),deleted=[],added=[],cacheModes=[];
   let claims=0,activations=0,currentCache='';
   globalThis.self={
     location:{
@@ -37,7 +37,8 @@
       if(!currentCache)currentCache=name;
       return {
       addAll:async assets=>{
-        added.push(...assets);
+        added.push(...assets.map(asset=>asset.url));
+        cacheModes.push(...assets.map(asset=>asset.cache));
         contents.set('https://example.test/BiathlonTracker/index.html',{
           body:'cached app'
         });
@@ -49,6 +50,9 @@
   globalThis.fetch=async()=>{
     throw Error('Network unavailable');
   };
+  globalThis.Request=class{
+    constructor(url,options={}){this.url=url;this.cache=options.cache;}
+  };
   (0,eval)(__workerSource);
   await test('Offline installation contains the complete local application',async()=>{
     let task;
@@ -57,8 +61,10 @@
     });
     await task;
     assert(added.includes('index.html')&&added.includes('src/app.js')&&added.includes('styles/app.css'));
+    assert(added.includes('src/updates.js'));
     assert(added.every(path=>!path.startsWith('http')));
-    assert(activations===0,'Update activated without user action');
+    assert(cacheModes.every(mode=>mode==='reload'),'New assets were read from a potentially stale HTTP cache');
+    assert(activations===0,'Worker activated before a request from the page');
   });
   await test('Cached application can be reopened with network unavailable',async()=>{
     let task;

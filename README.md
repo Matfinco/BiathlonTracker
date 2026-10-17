@@ -15,6 +15,8 @@ App per smartphone e tablet per registrare i colpi al poligono, conservare le se
 
 Aprire almeno una volta l’app con connessione e attendere nel Menu la conferma **“App pronta per la riapertura senza connessione”**. Poi provare la riapertura in modalità aereo. Il salvataggio locale funziona indipendentemente dalla sincronizzazione.
 
+All’apertura l’app controlla gli aggiornamenti e attiva automaticamente una nuova versione pronta prima di rendere disponibili i comandi. Il controllo iniziale dura al massimo circa tre secondi; se l’aggiornamento termina più tardi, resta disponibile nel Menu e non interrompe il lavoro. In assenza di rete viene usata la versione già installata. Prima della riapertura vengono attese le scritture locali; un collegamento personale ancora da confermare viene conservato temporaneamente per riproporlo dopo l’aggiornamento. Per installare questa nuova gestione su una vecchia versione può servire un ultimo aggiornamento manuale.
+
 ## Pubblicazione e accesso degli allenatori
 
 L’indirizzo del deployment, le firme e le chiavi **non sono inclusi nel codice pubblico**. Si configurano manualmente su ciascun dispositivo.
@@ -46,6 +48,7 @@ Il backup ordinario omette la chiave personale: va reinserita dopo il ripristino
 - `src/storage.js`: transazioni IndexedDB, recupero e notifiche tra schede.
 - `src/sync.js`: unico motore di invio, timeout, tentativi successivi e conferme per operazione.
 - `src/app.js`: interazioni dell’interfaccia.
+- `src/updates.js`: controllo degli aggiornamenti all’avvio e attivazione prima dell’uso.
 - `sw.js`, `manifest.webmanifest`, `icons/`: caricamento offline e installazione.
 - `backend/Code.gs`: script Google Apps Script, versionato insieme all’app.
 

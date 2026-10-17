@@ -1,10 +1,10 @@
 'use strict';
-const CACHE='biathlon-field-v6-5';
-const ASSETS=['./','index.html','styles/app.css','src/domain.js','src/storage.js','src/sync.js','src/app.js','manifest.webmanifest','icons/target.svg','icons/icon-192.png','icons/icon-512.png'];
+const CACHE='biathlon-field-v6-6';
+const ASSETS=['./','index.html','styles/app.css','src/domain.js','src/storage.js','src/sync.js','src/updates.js','src/app.js','manifest.webmanifest','icons/target.svg','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS.map(url=>new Request(url,{cache:'reload'})))));
 });
-// New versions wait for an explicit update between series.
+// The page requests activation at startup or after the user accepts a later update.
 self.addEventListener('message',event=>{
   if(event.data?.type==='ACTIVATE')self.skipWaiting();
   if(event.data?.type==='CLAIM')self.clients.claim();

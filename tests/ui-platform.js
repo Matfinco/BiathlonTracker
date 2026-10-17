@@ -187,6 +187,17 @@ globalThis.location={
     globalThis.__reloaded=true;
   }
 };
+// Simulate reopening after an automatic update while a personal invite was pending.
+globalThis.__uiSession=new Map([['biathlon-update-pending-access',JSON.stringify({
+  at:Date.now(),fragment:'#accesso='+encodeURIComponent(JSON.stringify({
+    v:1,name:'Coach Invito',token:'pending-personal-test-token',url:'https://script.google.com/macros/s/test/exec'
+  }))
+})]]);
+globalThis.sessionStorage={
+  getItem:key=>__uiSession.get(key)??null,
+  setItem:(key,value)=>__uiSession.set(key,String(value)),
+  removeItem:key=>__uiSession.delete(key)
+};
 globalThis.addEventListener=()=>{
 };
 globalThis.Blob=class{

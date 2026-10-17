@@ -34,4 +34,10 @@ Da svolgere prima dell’uso in allenamento. Le prove automatiche usano API simu
 
 ## Aggiornamenti
 
-Quando compare un aggiornamento, applicarlo tramite il Menu. Verificare che la pagina si riapra e che serie, bozze e operazioni pendenti siano presenti. Ripetere la riapertura in modalità aereo.
+- Pubblicare una nuova versione e riaprire l’app con connessione: l’aggiornamento pronto deve essere attivato automaticamente prima di rendere disponibili i comandi. Verificare la presenza di serie, bozze e invii pendenti dopo la riapertura.
+- Provare con rete assente o lenta: il controllo iniziale deve essere breve e l’app deve restare utilizzabile con la versione già disponibile. Ripetere la riapertura in modalità aereo.
+- Far arrivare un aggiornamento dopo aver iniziato a registrare: deve comparire nel Menu, senza riaprire automaticamente la pagina durante il lavoro.
+- Aprire un collegamento personale con un aggiornamento pronto: dopo la riapertura deve comparire la conferma dell’accesso dell’allenatore corretto.
+- Con due schede aperte, aggiornare una sola scheda: l’altra deve poter proseguire la registrazione senza essere ricaricata.
+
+Per passare da una versione che offre soltanto aggiornamenti manuali alla nuova gestione può servire un ultimo aggiornamento dal Menu. I successivi vengono controllati automaticamente all’apertura.

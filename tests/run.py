@@ -49,7 +49,7 @@ try:
     for source in sources:
         evaluate('new Function(' + json.dumps(source.read_text()) + '); "compiled"')
     evaluate((ROOT / 'tests/platform.js').read_text())
-    for name in ['src/domain.js', 'src/storage.js', 'src/sync.js', 'backend/Code.gs', 'tests/regression.js']:
+    for name in ['src/domain.js', 'src/storage.js', 'src/sync.js', 'src/updates.js', 'backend/Code.gs', 'tests/regression.js']:
         evaluate((ROOT / name).read_text())
     # Entering/leaving JSC drains promise microtasks. All network and timers are simulated.
     for _ in range(1000):
@@ -64,6 +64,13 @@ try:
             break
     else:
         raise RuntimeError('Storage tests did not finish')
+    evaluate('globalThis.testDone=false')
+    evaluate((ROOT / 'tests/update-regression.js').read_text())
+    for _ in range(1000):
+        if evaluate('String(globalThis.testDone)') == 'true':
+            break
+    else:
+        raise RuntimeError('Update tests did not finish')
     class TreeParser(HTMLParser):
         def __init__(self):
             super().__init__()
