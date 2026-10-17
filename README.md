@@ -6,9 +6,10 @@ App per smartphone e tablet per registrare i colpi al poligono, conservare le se
 
 - Bersaglio a tutta larghezza, senza margini laterali, colonne o limite massimo di larghezza. Le proporzioni 400 × 440 rimangono costanti, anche in orizzontale; si può scorrere verticalmente.
 - Atleta, Terra/Piedi, tipo di allenamento e numero della serie sempre visibili. Bozze indipendenti per sessione, atleta, modalità e posizione.
+- Tipi di allenamento: Azzeramento, Tiro da fermo, i1-i2, i3, i4, i5, Gara, Altro. Le serie e le bozze precedenti mantengono la categoria originale e restano modificabili; le nuove scelte usano le categorie aggiornate.
 - Cinque colpi iniziali; limite modificabile da **1 a 50** nelle impostazioni. Abbassarlo non elimina colpi già presenti.
 - Tocco per inserire, anche nello stesso punto di un colpo precedente. “Modifica colpi” permette di scegliere il numero e spostare il colpo, con vista ingrandita; “Annulla colpo” rimuove l’ultimo.
-- Salva e Annulla restano raggiungibili nella barra inferiore. Tema chiaro da esterno o scuro, marcatori colorati con forme diverse o bianco/nero, comandi di almeno 56 pixel per le operazioni principali.
+- Salva e Annulla restano raggiungibili nella barra inferiore. Interfaccia chiara da esterno, marcatori colorati con forme diverse o bianco/nero, comandi di almeno 56 pixel per le operazioni principali.
 - Storico di tutte le sessioni, bozze da riprendere, riepilogo locale, backup JSON e ripristino. Aprire una correzione conserva la serie originale fino al nuovo salvataggio.
 - Blocco dei comandi per trasporto/pulizia e mantenimento opzionale dello schermo acceso, dove il browser lo consente.
 - Selezione del vento tramite bandierine alle sei inclinazioni originali, dal livello 0 pendente al 5 disteso, su scala verticale con grandi pulsanti. La bandierina scelta resta visibile anche accanto al comando Vento.

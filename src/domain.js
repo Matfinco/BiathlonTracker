@@ -1,7 +1,9 @@
 /* Rules shared by the field interface, migration and regression tests. */
 (function (root) {
   'use strict';
-  const MODES = ['Azzeramento', 'Gara', 'L2', 'L3', 'L4', 'Solo Sparo', 'Altro'];
+  const MODES = ['Azzeramento', 'Tiro da fermo', 'i1-i2', 'i3', 'i4', 'i5', 'Gara', 'Altro'];
+  // Keep old categories readable for saved series, pending uploads and drafts.
+  const STORED_MODES = [...MODES, 'L2', 'L3', 'L4', 'Solo Sparo'];
   const VERSION = 6;
   const clone = value => JSON.parse(JSON.stringify(value));
   const uid = () => root.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
@@ -126,7 +128,7 @@
   }
   function setContext(state, athleteId, mode, position) {
     if (athleteId && !state.meta.activeIds.includes(id(athleteId))) throw Error('Atleta non presente nella sessione.');
-    if (!MODES.includes(mode) || !['T','P'].includes(position)) throw Error('Posizione o modalità non valida.');
+    if (!STORED_MODES.includes(mode) || !['T','P'].includes(position)) throw Error('Posizione o modalità non valida.');
     Object.assign(state.meta, {
       currentAthleteId:athleteId ? id(athleteId) : '', currentMode:mode, currentPos:position
     });
@@ -264,13 +266,13 @@
     m.activeIds=(old.activeAthletes||[]).map(a=>id(a.id)).filter(i=>m.roster.some(a=>a.id===i));
     m.currentAthleteId=m.activeIds.includes(String(old.currentAthleteId))?String(old.currentAthleteId):(m.activeIds[0]||'');
     Object.assign(m,{
-      coachName:text(old.coachName),cloudUrl:text(old.cloudUrl),lookerUrl:text(old.lookerUrl),currentPos:old.currentPos==='P'?'P':'T',currentMode:MODES.includes(old.currentMode)?old.currentMode:'Azzeramento',shotColor:old.shotColor==='white'?'white':'color',currentWind:wind(old.currentWind),lastActivity:old.sessionTimestamp||Date.now()
+      coachName:text(old.coachName),cloudUrl:text(old.cloudUrl),lookerUrl:text(old.lookerUrl),currentPos:old.currentPos==='P'?'P':'T',currentMode:STORED_MODES.includes(old.currentMode)?old.currentMode:'Azzeramento',shotColor:old.shotColor==='white'?'white':'color',currentWind:wind(old.currentWind),lastActivity:old.sessionTimestamp||Date.now()
     });
-    for (const a of old.activeAthletes||[]) for (const mode of MODES) for (const p of ['T','P']) m.counters[counterKey(id(a.id),mode,p,m.sessionId)] = a.seriesByMode?.[mode]?.[p] || (mode==='Azzeramento' ? a[p==='T'?'seriesT':'seriesP'] : 1) || 1;
+    for (const a of old.activeAthletes||[]) for (const mode of STORED_MODES) for (const p of ['T','P']) m.counters[counterKey(id(a.id),mode,p,m.sessionId)] = a.seriesByMode?.[mode]?.[p] || (mode==='Azzeramento' ? a[p==='T'?'seriesT':'seriesP'] : 1) || 1;
     for (const h of old.history||[]) {
       const pos=h.position==='P'?'P':'T';
       s.series.push({
-        ...clone(h),id:id(h.id),sessionId:m.sessionId,athleteId:id(h.athleteId),coach:text(h.coach||old.coachName),position:pos,type:MODES.includes(h.type)?h.type:'Altro',number:parseInt(h.series,10)||1,shots:shots(h.shots,pos,true)
+        ...clone(h),id:id(h.id),sessionId:m.sessionId,athleteId:id(h.athleteId),coach:text(h.coach||old.coachName),position:pos,type:STORED_MODES.includes(h.type)?h.type:'Altro',number:parseInt(h.series,10)||1,shots:shots(h.shots,pos,true)
       });
     }
     for (const q of old.syncQueue||[]) {
@@ -300,7 +302,7 @@
     m.shotLimit=limit(m.shotLimit);
     m.activeIds=m.activeIds.map(id).filter(i=>m.roster.some(a=>a.id===i));
     if(!['day','night'].includes(m.theme)||!['color','white'].includes(m.shotColor)||!finite(m.revision)||m.revision<0)throw Error('Aspetto o versione del salvataggio non validi.');
-    if (!MODES.includes(m.currentMode)||!['T','P'].includes(m.currentPos)||!m.sessionId||!m.drafts||typeof m.drafts!=='object'||!m.counters||typeof m.counters!=='object') throw Error('Configurazione del backup non valida.');
+    if (!STORED_MODES.includes(m.currentMode)||!['T','P'].includes(m.currentPos)||!m.sessionId||!m.drafts||typeof m.drafts!=='object'||!m.counters||typeof m.counters!=='object') throw Error('Configurazione del backup non valida.');
     m.currentAthleteId=m.activeIds.includes(String(m.currentAthleteId))?String(m.currentAthleteId):(m.activeIds[0]||'');
     const seen=new Set();
     for(const r of s.series){

@@ -58,6 +58,27 @@
     assert(element('athlete-select').value==='1');
     assert(element('position-button').textContent==='Terra');
   });
+  await test('Updated training menu keeps an old series editable and saves new selections with their names',async()=>{
+    const s=__uiRepo.snapshot,D=BiathlonDomain;
+    D.setContext(s,'1','L3','T');
+    let draft=D.draft(s);D.addShot(s,200,220,draft.key,draft.version);
+    draft=D.draft(s);D.saveSeries(s,draft.key,draft.version);
+    await __uiRepo.onchange();await flush();
+    await element('history-open').click();
+    await element('history-list').children[0].children[1].children[1].click();await flush();
+    assert(element('mode-select').value==='L3');
+    assert(element('mode-select').children.find(o=>o.value==='L3').hidden);
+    await tap(240,240);await element('save-button').click();await flush();
+    assert(__uiRepo.snapshot.series[0].type==='L3');
+    const modes=['Azzeramento','Tiro da fermo','i1-i2','i3','i4','i5','Gara','Altro'];
+    assert(JSON.stringify(element('mode-select').children.filter(o=>!o.hidden).map(o=>o.value))===JSON.stringify(modes));
+    for(const mode of modes){
+      element('mode-select').value=mode;await element('mode-select').emit('change');await flush();
+      await tap();await element('save-button').click();await flush();
+      assert(__uiRepo.snapshot.series.at(-1).type===mode);
+      assert(__uiRepo.snapshot.outbox.at(-1).payload.type===mode);
+    }
+  });
   await test('Public access can keep local athletes offline but cannot download or upload to Google',async()=>{
     let calls=0;
     const oldFetch=globalThis.fetch;

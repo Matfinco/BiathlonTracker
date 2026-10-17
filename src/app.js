@@ -25,7 +25,7 @@
   let receivedInvitation=restoreInvitation();
   if(linkInvitation)receivedInvitation=linkInvitation;
   const arrows={
-    C:'Calmo',N:'↑',NE:'↗',E:'→',SE:'↘',S:'↓',SW:'↙',W:'←',NW:'↖'
+    C:'0',N:'↑',NE:'↗',E:'→',SE:'↘',S:'↓',SW:'↙',W:'←',NW:'↖'
   };
   const sync=new BiathlonSync(repo,{
     onstate:info=>{
@@ -171,7 +171,6 @@
       selectedShot=0;
       resetGesture();
     }
-    document.body.dataset.theme=m.theme;
     $('target-box').classList.toggle('mono',m.shotColor==='white');
     const athletes=m.roster.filter(a=>m.activeIds.includes(a.id));
     setSelect($('athlete-select'),isReview?[{
@@ -180,7 +179,17 @@
       id:'',name:'Aggiungi o seleziona atleti'
     }]),isReview?r.athleteId:m.currentAthleteId);
     $('athlete-select').disabled=isReview||!athletes.length||locked;
-    $('mode-select').value=isReview?r.type:m.currentMode;
+    const mode=isReview?r.type:m.currentMode;
+    setSelect($('mode-select'),D.MODES.map(name=>({id:name,name})),mode);
+    if(!D.MODES.includes(mode)){
+      // Show an old record's category without offering it for new selections.
+      const previous=node('option',mode);
+      previous.value=mode;
+      previous.hidden=true;
+      previous.disabled=true;
+      $('mode-select').prepend(previous);
+      $('mode-select').value=mode;
+    }
     $('mode-select').disabled=isReview||locked;
     const position=isReview?r.position:m.currentPos;
     $('position-button').textContent=position==='T'?'Terra':'Piedi';
@@ -299,7 +308,7 @@
   }
   function fillSettings(){
     const m=state.meta;
-    for(const [input,key]of [['coach-name','coachName'],['cloud-url','cloudUrl'],['looker-url','lookerUrl'],['api-token','apiToken'],['shot-limit','shotLimit'],['theme-select','theme'],['shot-color-select','shotColor']])$(input).value=m[key]??'';
+    for(const [input,key]of [['coach-name','coachName'],['cloud-url','cloudUrl'],['looker-url','lookerUrl'],['api-token','apiToken'],['shot-limit','shotLimit'],['shot-color-select','shotColor']])$(input).value=m[key]??'';
     const coach=Boolean(m.coachName&&m.cloudUrl&&m.apiToken);
     $('access-status').textContent=coach?m.coachName:m.adminToken?'Amministratore':'Nessun allenatore';
     $('access-help').textContent=coach?'Accesso allenatore configurato su questo dispositivo.':m.adminToken?'Per registrare, scegli il tuo nome in Gestisci allenatori → Usa su questo dispositivo.':'Attiva il tuo collegamento personale in Accesso e sincronizzazione.';
@@ -461,7 +470,7 @@
   $('share-back').addEventListener('click',()=>{openDialog('admin-dialog');renderAdmin();});
   function settingsConfig(){
     return {
-      coachName:$('coach-name').value.trim(),cloudUrl:D.syncUrl($('cloud-url').value),lookerUrl:D.validUrl($('looker-url').value),apiToken:$('api-token').value.trim(),shotLimit:D.limit($('shot-limit').value),theme:$('theme-select').value,shotColor:$('shot-color-select').value
+      coachName:$('coach-name').value.trim(),cloudUrl:D.syncUrl($('cloud-url').value),lookerUrl:D.validUrl($('looker-url').value),apiToken:$('api-token').value.trim(),shotLimit:D.limit($('shot-limit').value),theme:'day',shotColor:$('shot-color-select').value
     };
   }
   $('connection-check').addEventListener('click',async()=>{
@@ -1044,7 +1053,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-9');
+        const cache=await caches.open('biathlon-field-v6-10');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();

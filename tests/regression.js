@@ -218,6 +218,43 @@
     bad.series[0].shots[0].x=NaN;
     throws(()=>D.validate(bad));
   });
+  await test('Existing training categories retain drafts, pending uploads and editable history',()=>{
+    for(const mode of ['L2','L3','L4','Solo Sparo']){
+      const s=setup();
+      D.setContext(s,'1',mode,'T');add(s);
+      const original=save(s),pending=D.clone(s.outbox[0]);
+      add(s,240,220);
+      const oldDraft=D.clone(D.draft(s)),restored=D.validate(s);
+      D.setContext(restored,'1','i5','T');add(restored);save(restored);
+      D.setContext(restored,'1',mode,'T');
+      equal(D.draft(restored),oldDraft);
+      equal(restored.series[0],original);
+      equal(restored.outbox[0],pending);
+      // Correct the archived record on a copy without its separate unfinished draft.
+      const correction=D.validate(restored);
+      delete correction.meta.drafts[oldDraft.key];
+      D.editSeries(correction,original.id);
+      equal(save(correction).type,mode);
+    }
+  });
+  await test('Version 5 migration retains old category names and per-category counters',()=>{
+    for(const mode of ['L2','L3','L4','Solo Sparo']){
+      const source=setup();source.meta.coachName='Coach';
+      D.setContext(source,'1',mode,'T');add(source);
+      const original=save(source);
+      const migrated=D.migrate({
+        roster:source.meta.roster,activeAthletes:[{id:'1',seriesByMode:{[mode]:{T:7}}}],
+        currentAthleteId:'1',currentPos:'T',currentMode:mode,coachName:'Coach',
+        currentShots:[D.shot(240,220,'T',1)],history:[original],syncQueue:[D.packet(original)]
+      });
+      equal(D.draft(migrated).mode,mode);
+      equal(D.draft(migrated).number,7);
+      equal(D.draft(migrated).shots[0].x,240);
+      equal(migrated.series[0].type,mode);
+      equal(migrated.outbox[0].payload.type,mode);
+      D.validate(migrated);
+    }
+  });
   await test('Manual and automatic requests share one in-flight promise',async()=>{
     const gate=deferred();
     let calls=0;
@@ -601,6 +638,18 @@
     equal(sheets.Database.getLastRow(),2);
     equal(sheets.Database.grid[1][11],'Errore');
     equal(sheets.Database.grid[0].slice(0,15),BIATHLON_HEADERS.slice(0,15));
+  });
+  await test('Every new training category saves independently and reaches Google with its chosen name',()=>{
+    server();
+    const s=setup();s.meta.coachName='Coach';
+    const modes=['Azzeramento','Tiro da fermo','i1-i2','i3','i4','i5','Gara','Altro'];
+    for(const mode of modes){
+      D.setContext(s,'1',mode,'T');add(s);
+      equal(save(s).series,'1T');
+    }
+    const restored=D.validate(s),inserts=restored.outbox.map(op=>op.payload);
+    equal(post({inserts}).status,'success');
+    equal(sheets.Database.grid.slice(1).map(row=>row[2]),modes);
   });
   await test('Database_Colpi receives authenticated series and the connection check does not change data',()=>{
     server();

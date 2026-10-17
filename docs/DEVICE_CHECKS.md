@@ -7,7 +7,7 @@ Da svolgere prima dell’uso in allenamento. Le prove automatiche usano API simu
 - Smartphone indicativamente 360 × 640 e 390 × 844, tablet verticale e orizzontale. Verificare anche modalità installata, browser con barre visibili, tastiera aperta e dimensioni testo aumentate.
 - Bersaglio da bordo a bordo, senza limite massimo di larghezza; le proporzioni restano 10:11. In orizzontale lo scorrimento verticale deve funzionare sul bersaglio durante l’inserimento.
 - Salva e Annulla raggiungibili nella barra inferiore; nessun controllo coperto dalle aree di sistema. Le finestre scorrono e il pulsante di chiusura rimane raggiungibile.
-- Provare tema chiaro e scuro al sole. Leggere nome atleta, posizione, modalità e serie senza avvicinare il dispositivo.
+- Provare l’interfaccia chiara al sole, con colpi a colori e in bianco e nero. Leggere nome atleta, posizione, modalità e serie senza avvicinare il dispositivo.
 - Con i guanti effettivamente usati: inserire dieci serie, correggere colpi e scegliere il vento. La compatibilità del guanto e la risposta con schermo bagnato dipendono anche dal dispositivo.
 - Due colpi nello stesso punto devono restare due. In Modifica selezionare un numero e provare tocco e trascinamento con vista ingrandita.
 - Dopo aver spostato un colpo, toccare una sola volta “Fine modifica”: la selezione e la lente devono sparire e il comando deve diventare “Modifica colpi”, senza riattivarsi. Ripetere con un tocco rapido subito dopo il trascinamento; scorrere sul pulsante o annullare il tocco non deve attivarlo.

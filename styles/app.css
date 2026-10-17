@@ -25,20 +25,6 @@ body{
   min-height:100vh;
   min-height:100dvh
 }
-body[data-theme=night]{
-  color-scheme:dark;
-  --bg:#111820;
-  --surface:#1c2732;
-  --text:#fff;
-  --muted:#d2dce1;
-  --line:#81919a;
-  --accent:#a9d8ff;
-  --on-accent:#08283e;
-  --secondary:#334452;
-  --danger:#ffb1a8;
-  --success:#a3e9bd;
-  --focus:#ffbf55
-}
 button,input,select{
   font:inherit
 }
