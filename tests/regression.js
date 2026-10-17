@@ -1,0 +1,652 @@
+(async function(){
+  const D=BiathlonDomain;
+  function assert(condition,message='Assertion failed'){
+    if(!condition)throw Error(message);
+  }
+  function equal(a,b){
+    assert(JSON.stringify(a)===JSON.stringify(b),JSON.stringify(a)+' != '+JSON.stringify(b));
+  }
+  function throws(fn){
+    let caught=false;
+    try{
+      fn();
+    }catch(e){
+      caught=true;
+    }
+    assert(caught,'Expected failure');
+  }
+  async function test(name,fn){
+    try{
+      await fn();
+      testResults.push({
+        name,ok:true
+      });
+    }catch(error){
+      testResults.push({
+        name,ok:false,error:String(error.stack||error)
+      });
+    }
+  }
+  function setup(){
+    const s=D.create();
+    s.meta.roster=[{
+      id:'1',name:'Atleta A'
+    },{
+      id:'2',name:'Atleta B'
+    }];
+    s.meta.activeIds=['1','2'];
+    s.meta.currentAthleteId='1';
+    D.draft(s);
+    return s;
+  }
+  function add(s,x=200,y=220){
+    const d=D.draft(s);
+    D.addShot(s,x,y,d.key,d.version);
+  }
+  function save(s){
+    const d=D.draft(s);
+    return D.saveSeries(s,d.key,d.version);
+  }
+  function repoFor(s){
+    return {
+      snapshot:s,async mutate(fn){
+        const next=D.clone(this.snapshot);
+        const value=fn(next);
+        this.snapshot=next;
+        return {
+          state:D.clone(next),value
+        };
+      }
+    };
+  }
+  function okResponse(options){
+    const payload=JSON.parse(options.body);
+    return {ok:true,json:async()=>({status:'success',protocolVersion:2,ack:{inserts:payload.inserts.map(p=>p.id),deletes:payload.deletes}})};
+  }
+  function engineFor(s,fetcher){
+    s.meta.cloudUrl='https://script.google.com/macros/s/test/exec';
+    s.meta.coachName='Coach';
+    s.meta.apiToken='coach-token';
+    const repo=repoFor(s),engine=new BiathlonSync(repo,{
+      online:()=>true,fetch:fetcher||(async(url,opts)=>okResponse(opts))
+    });
+    return {
+      repo,engine
+    };
+  }
+  function deferred(){
+    let resolve,reject;
+    const promise=new Promise((a,b)=>{
+      resolve=a;
+      reject=b;
+    });
+    return {
+      promise,resolve,reject
+    };
+  }
+  await test('Default is 5 shots; configurable integer range is 1..50',()=>{
+    equal(D.create().meta.shotLimit,5);
+    equal(D.limit(1),1);
+    equal(D.limit('50'),50);
+    for(const n of [0,51,2.5,'bad',null])throws(()=>D.limit(n));
+  });
+  await test('Lowering the limit never truncates a saved draft',()=>{
+    const s=setup();
+    for(let i=0;i<5;i++)add(s);
+    s.meta.shotLimit=1;
+    throws(()=>add(s));
+    equal(D.draft(s).shots.length,5);
+    equal(save(s).shots.length,5);
+  });
+  await test('Different athletes, positions and modes keep separate drafts',()=>{
+    const s=setup();
+    add(s,230,220);
+    D.setContext(s,'2','Gara','P');
+    equal(D.draft(s).shots.length,0);
+    add(s);
+    const b=save(s);
+    equal(b.athlete,'Atleta B');
+    D.setContext(s,'1','Azzeramento','T');
+    equal(D.draft(s).shots[0].x,230);
+  });
+  await test('String IDs stay strings and unknown athletes cannot be selected',()=>{
+    const s=setup();
+    D.setContext(s,'2','Gara','T');
+    equal(s.meta.currentAthleteId,'2');
+    throws(()=>D.setContext(s,'missing','Gara','T'));
+  });
+  await test('Stale tab cannot append or save under another context/version',()=>{
+    const s=setup(),d=D.clone(D.draft(s));
+    add(s);
+    throws(()=>D.addShot(s,200,220,d.key,d.version));
+    D.setContext(s,'2','Gara','T');
+    throws(()=>D.saveSeries(s,d.key,d.version));
+  });
+  await test('Prone and standing boundaries stay identical in display and cloud',()=>{
+    for(const p of ['T','P'])for(const delta of [-.51,-.01,0,.01,.49,.51]){
+      const s=setup();
+      s.meta.currentPos=p;
+      const threshold=p==='T'?70.4:180;
+      add(s,200+threshold+delta,220);
+      const screen=D.draft(s).shots[0].esito,r=save(s);
+      equal(D.packet(r).shots[0].esito,screen);
+      equal(screen,delta<=0?'Bersaglio':'Errore');
+    }
+  });
+  await test('Clustered shots at the same coordinates remain separate',()=>{
+    const s=setup();
+    add(s);
+    add(s);
+    equal(D.draft(s).shots.length,2);
+    equal(save(s).shots.map(s=>s.seq),[1,2]);
+  });
+  await test('Opening a saved series for editing preserves original and queue',()=>{
+    const s=setup();
+    add(s);
+    const r=save(s),out=D.clone(s.outbox);
+    D.editSeries(s,r.id);
+    equal(s.series.length,1);
+    equal(s.outbox,out);
+    equal(D.draft(s).replacesId,r.id);
+  });
+  await test('Replacement deletes old only on save and has a new identity',()=>{
+    const s=setup();
+    add(s);
+    const old=save(s);
+    D.editSeries(s,old.id);
+    const replacement=save(s);
+    assert(replacement.id!==old.id);
+    equal(s.series.length,1);
+    assert(s.outbox.some(o=>o.kind==='delete'&&o.seriesId===old.id));
+    assert(s.outbox.some(o=>o.kind==='insert'&&o.seriesId===replacement.id));
+  });
+  await test('New session keeps history, pending sends and old drafts',()=>{
+    const s=setup();
+    add(s);
+    save(s);
+    add(s);
+    const oldKey=D.draft(s).key;
+    D.startSession(s,['2']);
+    equal(s.series.length,1);
+    equal(s.outbox.length,1);
+    equal(s.meta.drafts[oldKey].shots.length,1);
+    equal(D.draft(s).number,1);
+  });
+  await test('Series counters are independent for athlete, mode and session',()=>{
+    const s=setup();
+    add(s);
+    save(s);
+    equal(D.draft(s).number,2);
+    D.setContext(s,'1','Gara','T');
+    equal(D.draft(s).number,1);
+    D.startSession(s,['1']);
+    equal(D.draft(s).number,1);
+  });
+  await test('Legacy migration preserves pixel coordinates, queues and ID types',()=>{
+    const old={
+      roster:[{
+        id:123,name:'A'
+      }],activeAthletes:[{
+        id:123,name:'A',seriesT:4
+      }],currentAthleteId:123,currentPos:'T',currentMode:'Azzeramento',currentShots:[{
+        seq:1,x:100,y:110,bx:200,by:220
+      }],history:[],syncQueue:[{
+        id:'legacy_1',coach:'Non specificato',position:'T',shots:[{
+          seq:1,x:270.49,y:220
+        }]
+      }],deleteQueue:['old'],coachName:'Coach'
+    };
+    const s=D.migrate(old);
+    equal(s.meta.currentAthleteId,'123');
+    equal(D.draft(s).number,4);
+    equal(D.draft(s).shots[0].x,200);
+    equal(s.outbox.length,2);
+    equal(s.outbox[0].payload.shots[0].esito,'Errore');
+    equal(s.outbox[0].payload.coach,'Coach');
+  });
+  await test('Backups round trip and reject unsupported/damaged formats',()=>{
+    const s=setup();
+    add(s);
+    save(s);
+    equal(D.validate(s),s);
+    throws(()=>D.validate({
+      meta:{
+        schemaVersion:999
+      }
+    }));
+    const bad=D.clone(s);
+    bad.series[0].shots[0].x=NaN;
+    throws(()=>D.validate(bad));
+  });
+  await test('Manual and automatic requests share one in-flight promise',async()=>{
+    const gate=deferred();
+    let calls=0;
+    const s=setup();
+    add(s);
+    save(s);
+    const {
+      engine
+    }
+    =engineFor(s,async(url,opts)=>{
+      calls++;
+      await gate.promise;
+      return okResponse(opts);
+    });
+    const a=engine.run(),b=engine.run();
+    assert(a===b);
+    await Promise.resolve();
+    gate.resolve();
+    await Promise.all([a,b]);
+    equal(calls,1);
+  });
+  await test('Acknowledgement keeps series added while a request is pending',async()=>{
+    const gate=deferred(),entered=deferred();
+    let sent;
+    const s=setup();
+    add(s);
+    const first=save(s);
+    const {
+      repo,engine
+    }
+    =engineFor(s,async(url,opts)=>{
+      sent=JSON.parse(opts.body);
+      entered.resolve();
+      await gate.promise;
+      return okResponse(opts);
+    });
+    const pending=engine.run();
+    await entered.promise;
+    await repo.mutate(state=>{
+      add(state);
+      save(state);
+    });
+    gate.resolve();
+    await pending;
+    equal(sent.inserts.map(p=>p.id),[first.id]);
+    equal(repo.snapshot.outbox.length,1);
+    assert(repo.snapshot.outbox[0].seriesId!==first.id);
+  });
+  await test('Deletion added during insert is kept for a later request',async()=>{
+    const gate=deferred(),entered=deferred(),s=setup();
+    add(s);
+    const r=save(s);
+    const {
+      repo,engine
+    }
+    =engineFor(s,async(url,opts)=>{
+      entered.resolve();
+      await gate.promise;
+      return okResponse(opts);
+    });
+    const pending=engine.run();
+    await entered.promise;
+    await repo.mutate(state=>D.removeSeries(state,r.id));
+    gate.resolve();
+    await pending;
+    equal(repo.snapshot.outbox.map(o=>o.kind),['delete']);
+  });
+  await test('Two tabs respect the shared synchronization lease',async()=>{
+    const gate=deferred(),entered=deferred(),s=setup();
+    add(s);
+    save(s);
+    const {
+      repo,engine
+    }
+    =engineFor(s,async(url,opts)=>{
+      entered.resolve();
+      await gate.promise;
+      return okResponse(opts);
+    });
+    const second=new BiathlonSync(repo,{
+      online:()=>true,fetch:async()=>{
+        throw Error('Overlapping request');
+      }
+    });
+    const pending=engine.run();
+    await entered.promise;
+    equal(await second.run(),{
+      idle:true
+    });
+    gate.resolve();
+    await pending;
+  });
+  await test('HTTP errors and partial acknowledgements preserve unconfirmed operations',async()=>{
+    const s=setup();
+    add(s);
+    const first=save(s);
+    add(s);
+    const second=save(s);
+    const {
+      repo,engine
+    }
+    =engineFor(s,async()=>({
+      ok:true,json:async()=>({
+        status:'success',protocolVersion:2,ack:{
+          inserts:[first.id],deletes:[]
+        }
+      })
+    }));
+    await engine.run();
+    equal(repo.snapshot.outbox.map(o=>o.seriesId),[second.id]);
+    engine.fetch=async()=>({
+      ok:false,status:503
+    });
+    let failed=false;
+    try{
+      await engine.run();
+    }catch(e){
+      failed=true;
+    }
+    assert(failed);
+    equal(repo.snapshot.outbox.length,1);
+    assert(!repo.snapshot.meta.syncLease);
+  });
+  await test('Coach configured after local save is filled at send time',async()=>{
+    let sent;
+    const s=setup();
+    add(s);
+    save(s);
+    const {
+      engine
+    }
+    =engineFor(s,async(url,opts)=>{
+      sent=JSON.parse(opts.body);
+      return okResponse(opts);
+    });
+    await engine.run();
+    equal(sent.inserts[0].coach,'Coach');
+  });
+  await test('Offline run does not claim or send any queue items',async()=>{
+    const s=setup();
+    add(s);
+    save(s);
+    const {
+      repo,engine
+    }
+    =engineFor(s);
+    engine.online=()=>false;
+    equal(await engine.run(),{
+      offline:true
+    });
+    equal(repo.snapshot.outbox.length,1);
+    assert(!repo.snapshot.meta.syncLease);
+  });
+  // Spreadsheet fixtures exercise the actual Apps Script handlers without touching a Google account.
+  class Range{
+    constructor(sheet,row,col,nr=1,nc=1){
+      Object.assign(this,{
+        sheet,row,col,nr,nc
+      });
+    }
+    getValues(){
+      return Array.from({
+        length:this.nr
+      },(_,i)=>Array.from({
+        length:this.nc
+      },(_,j)=>this.sheet.grid[this.row+i-1]?.[this.col+j-1]??''));
+    }
+    getValue(){
+      return this.getValues()[0][0];
+    }
+    setValues(rows){
+      rows.forEach((row,i)=>row.forEach((v,j)=>{
+        this.sheet.grid[this.row+i-1]??=[];
+        this.sheet.grid[this.row+i-1][this.col+j-1]=v;
+      }));
+      return this;
+    }
+    setValue(value){
+      return this.setValues(Array.from({
+        length:this.nr
+      },()=>Array(this.nc).fill(value)));
+    }
+  }
+  class Sheet{
+    constructor(name,grid=[]){
+      this.name=name;
+      this.grid=grid;
+      this.maxColumns=26;
+    }
+    getRange(...args){
+      return new Range(this,...args);
+    }
+    getLastRow(){
+      let i=this.grid.length;
+      while(i&&!this.grid[i-1].some(v=>v!==''&&v!=null))i--;
+      return i;
+    }
+    getMaxColumns(){
+      return this.maxColumns;
+    }
+    getMaxRows(){return this.maxRows||1000;}
+    insertRowsAfter(row,count){this.maxRows=this.getMaxRows()+count;}
+    insertColumnsAfter(col,n){
+      this.maxColumns+=n;
+    }
+    hideSheet(){
+    }
+    getRangeList(ranges){
+      return {
+        setValue:value=>ranges.forEach(r=>{
+          const row=Number(r.slice(1));
+          this.getRange(row,15).setValue(value);
+        })
+      };
+    }
+  }
+  let sheets,properties,locked;
+  function server(){
+    sheets={
+      Database:new Sheet('Database',[BIATHLON_HEADERS.slice(0,15)]),Anagrafica:new Sheet('Anagrafica',[['Nome','Email','Note'],['Atleta A','a@example.test','']])
+    };
+    properties={
+      BIATHLON_COACH_KEYS:JSON.stringify({
+        'coach-token':'Coach','other-token':'Other Coach'
+      })
+    };
+    locked=false;
+    globalThis.SpreadsheetApp={
+      getActiveSpreadsheet:()=>({
+        getSheetByName:n=>sheets[n]||null,insertSheet:n=>(sheets[n]=new Sheet(n))
+      }),flush:()=>{
+      }
+    };
+    globalThis.LockService={
+      getScriptLock:()=>({
+        tryLock:()=>!locked,hasLock:()=>true,releaseLock:()=>{
+        }
+      })
+    };
+    globalThis.PropertiesService={
+      getScriptProperties:()=>({
+        getProperty:k=>properties[k]||null
+      })
+    };
+    globalThis.Utilities={
+      getUuid:D.uid
+    };
+    globalThis.ContentService={
+      MimeType:{
+        JSON:'json'
+      },createTextOutput:value=>({
+        setMimeType:()=>JSON.parse(value)
+      })
+    };
+  }
+  function serverPacket(){
+    const s=setup();
+    s.meta.coachName='Coach';
+    add(s,270.49,220);
+    return D.packet(save(s));
+  }
+  function post(data){
+    return doPost({
+      postData:{
+        contents:JSON.stringify({
+          token:'coach-token',...data
+        })
+      }
+    });
+  }
+  await test('Server insertion is idempotent across retries',()=>{
+    server();
+    const p=serverPacket();
+    equal(post({
+      inserts:[p]
+    }).status,'success');
+    equal(post({
+      inserts:[p,p]
+    }).status,'success');
+    equal(sheets.Database.getLastRow(),2);
+    equal(sheets.Database.grid[1][11],'Errore');
+    equal(sheets.Database.grid[0].slice(0,15),BIATHLON_HEADERS.slice(0,15));
+  });
+  await test('Server tombstone prevents delayed inserts from resurrecting deleted series',()=>{
+    server();
+    const p=serverPacket();
+    equal(post({
+      deletes:[p.id]
+    }).status,'success');
+    equal(post({
+      inserts:[p]
+    }).status,'success');
+    equal(sheets.Database.getLastRow(),1);
+    equal(sheets._BiathlonDeleted.getLastRow(),2);
+  });
+  await test('Server soft deletion is idempotent and keeps A:O columns in place',()=>{
+    server();
+    const p=serverPacket();
+    post({
+      inserts:[p]
+    });
+    post({
+      deletes:[p.id]
+    });
+    post({
+      deletes:[p.id]
+    });
+    equal(sheets.Database.grid[1][14],'TRUE');
+    equal(sheets.Database.getLastRow(),2);
+    equal(sheets._BiathlonDeleted.getLastRow(),2);
+  });
+  await test('Malformed batch is rejected before any writes',()=>{
+    server();
+    const p=serverPacket(),bad=D.clone(p);
+    bad.id='bad';
+    bad.shots[0].x=Infinity;
+    const before=D.clone(sheets.Anagrafica.grid);
+    equal(post({
+      inserts:[p,bad]
+    }).status,'error');
+    equal(sheets.Database.getLastRow(),1);
+    equal(sheets.Anagrafica.grid,before);
+  });
+  await test('Server computes full-precision results instead of trusting client labels',()=>{
+    server();
+    const p=serverPacket();
+    p.shots[0].esito='Bersaglio';
+    p.shots[0].distanza=0;
+    post({
+      inserts:[p]
+    });
+    equal(sheets.Database.grid[1][11],'Errore');
+    assert(Math.abs(sheets.Database.grid[1][10]-70.49)<1e-9);
+  });
+  await test('Server roster IDs survive row reordering',()=>{
+    server();
+    sheets.Anagrafica.grid.push(['Atleta B','b@example.test','']);
+    const first=post({
+      action:'roster'
+    }).roster;
+    const tmp=sheets.Anagrafica.grid[1];
+    sheets.Anagrafica.grid[1]=sheets.Anagrafica.grid[2];
+    sheets.Anagrafica.grid[2]=tmp;
+    const second=post({
+      action:'roster'
+    }).roster;
+    equal(first.find(a=>a.name==='Atleta A').id,second.find(a=>a.name==='Atleta A').id);
+  });
+  await test('Personal keys are required for reads/writes and can be revoked',()=>{
+    server();
+    equal(doGet({
+      parameter:{
+      }
+    }).status,'error');
+    equal(post({
+      token:'',inserts:[serverPacket()]
+    }).status,'error');
+    equal(post({
+      action:'roster'
+    }).status,'success');
+    properties.BIATHLON_COACH_KEYS='{}';
+    equal(post({
+      action:'roster'
+    }).status,'error');
+  });
+  await test('Server refuses a batch when another invocation owns the lock',()=>{
+    server();
+    locked=true;
+    equal(post({
+      inserts:[serverPacket()]
+    }).status,'error');
+    equal(sheets.Database.getLastRow(),1);
+  });
+  await test('Spreadsheet formulas in user-provided text are escaped',()=>{
+    server();
+    const p=serverPacket();
+    p.athlete='=IMPORTXML("bad")';
+    p.coach='=1+1';
+    properties.BIATHLON_COACH_KEYS=JSON.stringify({
+      'coach-token':'=1+1'
+    });
+    equal(post({
+      inserts:[p]
+    }).status,'success');
+    assert(sheets.Database.grid[1][3].startsWith("'="));
+    assert(sheets.Database.grid[1][4].startsWith("'="));
+  });
+  await test('Personal key cannot impersonate another coach or delete their records',()=>{
+    server();
+    const p=serverPacket();
+    equal(post({
+      inserts:[p]
+    }).status,'success');
+    equal(post({
+      inserts:[p],token:'other-token'
+    }).status,'error');
+    equal(post({
+      deletes:[p.id],token:'other-token'
+    }).status,'error');
+    equal(sheets.Database.grid[1][14],'FALSE');
+  });
+  await test('Server rejects formula identifiers before touching the sheet',()=>{
+    server();
+    const p=serverPacket();
+    p.id='=1+1';
+    equal(post({
+      inserts:[p]
+    }).status,'error');
+    equal(sheets.Database.getLastRow(),1);
+  });
+  await test('Roster merge updates IDs in drafts, history, counters and pending packets',()=>{
+    const s=setup();add(s);save(s);add(s);D.mergeRoster(s,[{id:'stable-athlete-id',name:'Atleta A'}]);
+    equal(s.meta.currentAthleteId,'stable-athlete-id');equal(D.draft(s).athleteId,'stable-athlete-id');equal(s.series[0].athleteId,'stable-athlete-id');equal(s.outbox[0].payload.athleteId,'stable-athlete-id');equal(D.draft(s).number,2);
+  });
+  await test('Backup import rejects coordinates outside the target',()=>{const s=setup();add(s);save(s);s.series[0].shots[0].x=401;throws(()=>D.validate(s));});
+  await test('Editing an archived series preserves its original date',()=>{const s=setup();add(s);const r=save(s);r.timestamp='2025-01-01T10:00:00.000Z';r.localDate='2025-01-01';D.editSeries(s,r.id);const edited=save(s);equal(edited.timestamp,r.timestamp);equal(edited.localDate,'2025-01-01');});
+  await test('Missing acknowledgements and old server versions never empty the queue',async()=>{
+    for(const reply of [{status:'success',protocolVersion:1},{status:'success',protocolVersion:2,ack:null}]){const s=setup();add(s);save(s);const {repo,engine}=engineFor(s,async()=>({ok:true,json:async()=>reply}));let failed=false;try{await engine.run();}catch(error){failed=true;}assert(failed);equal(repo.snapshot.outbox.length,1);}
+  });
+  await test('Requests that time out keep operations and release the synchronization lease',async()=>{
+    const s=setup();add(s);save(s);const entered=deferred();const {repo,engine}=engineFor(s,async(url,opts)=>{entered.resolve();return new Promise((resolve,reject)=>opts.signal.addEventListener('abort',()=>{const error=Error('Aborted');error.name='AbortError';reject(error);}));});engine.timeout=90123;
+    const pending=engine.run().catch(()=>{});await entered.promise;const timer=Array.from(__timers.values()).find(t=>t.ms===90123);assert(timer);timer.fn();await pending;equal(repo.snapshot.outbox.length,1);assert(!repo.snapshot.meta.syncLease);
+  });
+  await test('Server appends by actual IDs rather than distant formulas',()=>{server();sheets.Database.grid[20]=['','','formula'];const p=serverPacket();equal(post({inserts:[p]}).status,'success');equal(sheets.Database.grid[1][0],p.id);equal(sheets.Database.grid[20][2],'formula');});
+  await test('Server expands the sheet before writing beyond its row limit',()=>{server();sheets.Database.maxRows=1;const p=serverPacket();equal(post({inserts:[p]}).status,'success');assert(sheets.Database.getMaxRows()>=2);});
+  globalThis.testDone=true;
+})().catch(error=>{
+  testResults.push({
+    name:'test harness',ok:false,error:String(error.stack||error)
+  });
+  testDone=true;
+});

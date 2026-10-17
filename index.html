@@ -1,1306 +1,461 @@
 <!DOCTYPE html>
 <html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="mobile-web-app-capable" content="yes">
-    <link rel="manifest" href="manifest.webmanifest">
-    <title>Biathlon Tracker</title>
-    
-    <style>
-        :root {
-            --bg: #1e1e1e; --text: #ffffff; --accent: #007aff;
-            --target-box: #f5f5f5; --target-center: #1a1a1a;
-            --shot-color: #ff3b30; --review-bg: #8b4513; 
-        }
-        body { margin: 0; padding: env(safe-area-inset-top, 15px) env(safe-area-inset-right, 15px) env(safe-area-inset-bottom, 15px) env(safe-area-inset-left, 15px); background-color: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; flex-direction: column; height: 100vh; min-height: 100vh; overflow: hidden; box-sizing: border-box; transition: background-color 0.3s; }
-        body.review-mode { background-color: var(--review-bg); }
-        body.modal-open { overflow: hidden; }
-
-        .header { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; margin-top: 10px; }
-        .header-title-container { display: flex; align-items: center; gap: 8px; }
-        .series-badge { background-color: rgba(0, 122, 255, 0.2); color: var(--accent); border: 1px solid var(--accent); padding: 4px 10px; border-radius: 8px; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
-        .header-btns { display: flex; gap: 5px; }
-        .header-btns button { padding: 8px 12px; font-size: 14px; min-width: auto; position: relative; }
-        
-        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        select, button, input[type="range"], input[type="text"], input[type="url"], input[type="number"] { padding: 12px; font-size: 14px; border-radius: 8px; border: none; background-color: #333; color: white; flex: 1; min-width: 120px; box-sizing: border-box; }
-        button { background-color: var(--accent); font-weight: bold; cursor: pointer; transition: background-color 0.2s;}
-        button.secondary { background-color: #555; }
-        button.danger { background-color: #d32f2f; }
-        button.warning { background-color: #ff9800; color: white; }
-        button.success { background-color: #34c759; color: white; }
-        
-        .btn-delete { width: 36px; height: 36px; padding: 0 !important; display: flex; justify-content: center; align-items: center; flex: 0 0 auto !important; min-width: unset !important; }
-        
-.target-container { display: flex; justify-content: center; align-items: center; margin: 10px 0; }
-
-    .target-box { width: 97%; max-width: 1000px; aspect-ratio: 1 / 1.1; background-color: var(--target-box); position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #444; touch-action: none; margin: 0 auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
-
-/* RIGA REINSERITA */
-.target-center { width: 90%; aspect-ratio: 1 / 1; background-color: var(--target-center); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
-
-        .target-cross-h { width: 100%; height: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 50%; left: 0; }
-        .target-cross-v { height: 100%; width: 1px; background: rgba(255,255,255,0.4); position: absolute; top: 0; left: 50%; }
-        .target-prone { width: 39.1%; aspect-ratio: 1 / 1; border: 1.5px solid rgba(255,255,255,0.6); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        .target-dot { width: 4px; height: 4px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-
-        .shot { width: 45px; height: 45px; box-sizing: border-box; border-radius: 50%; position: absolute; transform: translate(-50%, -50%); border: 2px solid white; cursor: grab; z-index: 10; display: flex; justify-content: center; align-items: center; color: white; font-size: 11px; font-weight: bold; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; transition: transform 0.1s ease, background-color 0.15s ease; }        .shot.hit { background-color: #34c759; } /* Verde */
-        .shot.miss { background-color: #ff3b30; } /* Rosso */
-        .shot.dragging { cursor: grabbing; transform: translate(-50%, -50%) scale(1.3); }
-        .slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
-        .slider-container span { min-width: 60px; text-align: center; font-weight: bold; }
-
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; overscroll-behavior: none; }
-        .modal { background: #222; width: 100%; max-width: 400px; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        .modal h3 { margin: 0 0 10px 0; border-bottom: 1px solid #444; padding-bottom: 5px; font-size: 18px; }
-        .list-container { list-style: none; padding: 0; margin: 0; }
-        .list-item { display: flex; justify-content: space-between; align-items: center; background: #333; padding: 10px 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px;}
-        .list-item-info { display: flex; flex-direction: column; gap: 3px; }
-        .list-item-date { font-size: 11px; color: #aaa; }
-        .list-item-btns { display: flex; gap: 5px; align-items: center; }
-        .list-item-btns button:not(.btn-delete) { padding: 6px 10px; min-width: auto; font-size: 12px; }
-        
-        .input-row { display: flex; gap: 10px; align-items: center; }
-        .compact-btns { display: flex; gap: 10px; }
-        .compact-btns button { padding: 8px; font-size: 13px; }
-        .section-box { background: #333; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; border: 1px solid #444; }
-        .section-box label { font-size: 12px; font-weight: bold; color: #aaa;}
-        .cloud-content { display: none; margin-top: 10px; }
-        .cloud-content.active { display: flex; flex-direction: column; gap: 10px; }
-        
-        .checklist { max-height: 250px; overflow-y: auto; background: #333; border-radius: 8px; padding: 10px; border: 1px solid #444;}
-        .checklist label { display: flex; align-items: center; gap: 10px; padding: 12px 5px; border-bottom: 1px solid #444; font-size: 16px; cursor: pointer;}
-        .checklist label:last-child { border-bottom: none; }
-        .checklist input[type="checkbox"] { flex: 0 0 auto; width: 20px; height: 20px; }
-
-        .pos-segmented { display: flex; background: #111; border-radius: 8px; padding: 3px; gap: 4px; }
-        .pos-segmented button { flex: 1; padding: 10px; border-radius: 6px; background: transparent; color: #aaa; font-size: 14px; font-weight: bold; }
-        .pos-segmented button.active { background: var(--accent); color: white; }
-        .stepper-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 10px 0; }
-        .stepper-btn { width: 50px; height: 50px; font-size: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; padding: 0; min-width: unset; }
-        .stepper-value { font-size: 32px; font-weight: bold; min-width: 80px; text-align: center; }
-
-        .hidden { display: none !important; }
-
-        body.theme-shot-white .shot { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #ffffff !important; }
-        body.theme-shot-white .shot.on-dark { background-color: #ffffff !important; color: #000000 !important; border: 2px solid #000000 !important; }
-
-        /* Nuova Architettura UI */
-        .top-bar { display: flex; align-items: center; gap: 10px; padding: 0; border-bottom: none; margin-bottom: 0; }
-        .top-bar .athlete-picker { flex: 1; min-width: 0; }
-        .athlete-picker option { font-size: 15px; }
-        .menu-toggle { position: relative; flex: 0 0 48px !important; width: 48px !important; height: 37px; min-height: 37px; padding: 0 !important; font-size: 25px !important; }
-        .hamburger-sync-dot { display: none; position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border: 1px solid #222; border-radius: 50%; background: #ff3b30; }
-        .hamburger-sync-dot.active { display: block; }
-        .top-bar button { background: transparent; padding: 5px 10px; min-width: auto; font-size: 14px; border: 1px solid #555; }
-        .setup-area { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
-        .athlete-picker { font-size: 15px; font-weight: bold; background-color: #2c2c2e; padding: 9px 12px; text-align: center; }
-        .badge-row { display: flex; gap: 8px; justify-content: center; align-items: center; }
-        .badge-row select, .badge-row button { padding: 8px 12px; font-size: 14px; flex: 1; text-align: center; background-color: #2c2c2e; margin: 0; }
-        .action-row, .bottom-bar { display: flex; gap: 10px; }
-        .action-row { margin-top: 5px; }
-        .bottom-bar { margin-top: 10px; padding-top: 0; }
-        .action-row button, .bottom-bar button { flex: 1 1 0; width: 0; height: 52px; min-height: 52px; }
-        .btn-huge { font-size: 18px; padding: 15px; text-transform: uppercase; letter-spacing: 1px; }
-        .btn-storico { background-color: #444; }
-        .bottom-bar .btn-storico, .bottom-bar .btn-huge { min-width: 0; padding: 12px; }
-        .setup-area { gap: 0; margin-bottom: 7px; }
-        .setup-area .badge-row { margin-top: 2px; }
-        .target-container { margin: 5px 0; }
-        .slider-container { display: none; }
-        body.review-mode .slider-container { display: flex; }
-        .top-bar, .badge-row, .slider-container, .action-row, .bottom-bar { margin-inline: 12px; }
-        .action-row button, .bottom-bar button { display: flex; align-items: center; justify-content: center; flex: 1 1 0; width: 0; height: 39px; min-height: 39px; padding: 8px 10px; font-size: 14px; font-weight: bold; line-height: 1; text-align: center; white-space: nowrap; }
-        .btn-huge { padding: 8px 10px; font-size: 14px; letter-spacing: 0; }
-        .history-athlete-btn { width: 36px; height: 36px; min-width: 36px; flex: 0 0 36px; padding: 0; border-radius: 50%; font-size: 20px; line-height: 1; }
-        .side-menu-overlay { display: none; position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,0.55); }
-        .side-menu-overlay.open { display: block; }
-        .side-menu { position: absolute; top: 0; right: 0; width: min(82vw, 320px); height: 100%; padding: 72px 18px 18px; box-sizing: border-box; background: #222; box-shadow: -8px 0 24px rgba(0,0,0,0.35); transform: translateX(100%); transition: transform 0.2s ease; }
-        .side-menu-overlay.open .side-menu { transform: translateX(0); }
-        .side-menu button { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-height: 48px; margin-bottom: 10px; text-align: left; }
-        .side-menu .side-menu-label { display: block; margin: 18px 0 6px; color: #aaa; font-size: 12px; font-weight: bold; }
-        .side-menu select { width: 100%; min-width: 0; margin-bottom: 10px; }
-        #settings-modal .modal { width: min(100%, 560px); max-width: 560px; box-sizing: border-box; }
-        .sync-menu-btn { position: relative; }
-        .sync-dot { display: none; width: 10px; height: 10px; margin-left: auto; border-radius: 50%; background: #ff3b30; }
-        .sync-dot.active { display: block; }
-
-        .wind-panel { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; align-items: center; width: 100%; box-sizing: border-box; }
-        .wind-intensity-control { display: flex; justify-content: center; height: 230px; margin: 0 auto; }
-        .wind-scale { position: relative; display: flex; flex-direction: column; justify-content: space-between; align-items: center; width: 100px; height: 100%; padding: 8px 0; box-sizing: border-box; }
-        .wind-level { width: 31px; height: 9px; padding: 0; min-width: 0; flex: 0 0 9px; border-radius: 3px; background: #666; border: 0; }
-        .wind-level.active { background: var(--accent); }
-        .wind-flag { position: absolute; left: 62px; bottom: 0; width: 34px; height: 34px; pointer-events: none; transition: bottom 0.15s ease; }
-        .wind-flag .flag-pole { position: absolute; left: 0; bottom: 0; width: 3px; height: 34px; border-radius: 2px; background: #f5f5f5; }
-        .wind-flag .flag-cloth { position: absolute; left: 2px; bottom: 29px; width: 25px; height: 9px; border-radius: 1px; background: #ff3b30; transform-origin: 0 50%; transform: rotate(90deg); transition: transform 0.15s ease; }
-        .wind-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
-        .wind-actions button { min-width: 0; width: 100%; }
-        .wind-intensity-range { display: none; }
-
-        /* Modulo Vento */
-        .compass-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 180px; max-width: 100%; margin: 15px auto; aspect-ratio: 1; }
-        .dir-btn { min-width: 0; width: 100%; border-radius: 50%; font-size: 22px; background-color: #333; padding: 0; display: flex; justify-content: center; align-items: center; aspect-ratio: 1; border: 2px solid transparent; }
-        .dir-btn.active { background-color: var(--accent); color: white; border: 2px solid white; transform: scale(1.1); }
-
-        @media (max-width: 600px) {
-            .badge-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
-            .badge-row select, .badge-row button { min-width: 0; width: 100%; padding: 9px 6px; }
-            .target-box { width: 97%; }
-            .wind-panel { grid-template-columns: 120px 1fr; gap: 8px; }
-            .wind-intensity-control { height: 190px; }
-            .wind-scale { width: 82px; }
-            .compass-grid { width: 150px; gap: 6px; margin: 8px auto; }
-            .modal { max-height: calc(100vh - 24px); padding: 14px; gap: 8px; overflow: hidden; }
-            .modal h3 { margin-bottom: 4px; }
-        }
-
-        @media (max-width: 600px) and (max-height: 700px) {
-            .wind-panel { grid-template-columns: 105px 1fr; gap: 4px; }
-            .wind-intensity-control { height: 130px; }
-            .wind-scale { width: 72px; }
-            .compass-grid { width: 120px; gap: 4px; margin: 4px auto; }
-            .dir-btn { font-size: 18px; }
-            .modal { padding: 10px; gap: 5px; }
-            .modal .input-row { margin-top: 5px !important; }
-        }
-    </style>
-</head>
-<body>
-
-    <!-- ZONA 1: TOP BAR (SISTEMA) -->
-    <div class="top-bar" id="top-bar">
-        <select id="athlete-select" class="athlete-picker"></select>
-        <button class="secondary menu-toggle" aria-label="Apri menu" onclick="toggleSideMenu()">☰<span id="hamburger-sync-dot" class="hamburger-sync-dot"></span></button>
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+  <meta content="#f4f1e8" name="theme-color"/>
+  <meta content="yes" name="apple-mobile-web-app-capable"/>
+  <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
+  <meta content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://script.google.com https://*.googleusercontent.com; object-src 'none'; base-uri 'self'; form-action 'none'" http-equiv="Content-Security-Policy"/>
+  <title>
+   Biathlon Tracker
+  </title>
+  <link href="manifest.webmanifest" rel="manifest"/>
+  <link href="icons/target.svg" rel="icon" type="image/svg+xml"/>
+  <link href="icons/icon-192.png" rel="apple-touch-icon"/>
+  <link href="styles/app.css" rel="stylesheet"/>
+  <script defer="" src="src/domain.js">
+  </script>
+  <script defer="" src="src/storage.js">
+  </script>
+  <script defer="" src="src/sync.js">
+  </script>
+  <script defer="" src="src/app.js">
+  </script>
+ </head>
+ <body>
+  <main aria-busy="true" id="app" inert="">
+   <header class="field-header">
+    <div class="athlete-row">
+     <label class="sr-only" for="athlete-select">
+      Atleta attuale
+     </label>
+     <select aria-label="Atleta attuale" id="athlete-select">
+      <option>
+       Nessun atleta
+      </option>
+     </select>
+     <button aria-label="Apri menu" class="icon-button" id="menu-open">
+      ☰
+     </button>
     </div>
-
-    <div class="side-menu-overlay" id="side-menu-overlay" onclick="if(event.target === this) closeSideMenu()">
-        <aside class="side-menu" aria-label="Menu principale">
-            <button class="secondary" onclick="openSettingsFromMenu()">⚙️ Menu</button>
-            <button class="secondary" onclick="openDashboardFromMenu()">📊 Statistiche</button>
-            <button class="secondary" onclick="openNewSessionFromMenu()">🔄 Nuova Sessione</button>
-            <button id="sync-menu-button" class="secondary sync-menu-btn" onclick="syncFromMenu()">☁️ Sincronizza <span id="sync-dot" class="sync-dot"></span></button>
-            <label class="side-menu-label" for="shot-color-select">COLORE DEI COLPI</label>
-            <select id="shot-color-select" class="secondary">
-                <option value="color">🎨 Colori</option>
-                <option value="white">⚪ Bianchi</option>
-            </select>
-        </aside>
+    <div class="context-row">
+     <button class="secondary" id="position-button">
+      Terra
+     </button>
+     <button class="secondary" id="series-button">
+      Serie 1
+     </button>
+     <label class="sr-only" for="mode-select">
+      Tipo di allenamento
+     </label>
+     <select aria-label="Tipo di allenamento" id="mode-select">
+      <option>
+       Azzeramento
+      </option>
+      <option>
+       Gara
+      </option>
+      <option>
+       L2
+      </option>
+      <option>
+       L3
+      </option>
+      <option>
+       L4
+      </option>
+      <option>
+       Solo Sparo
+      </option>
+      <option>
+       Altro
+      </option>
+     </select>
     </div>
-
-    <!-- ZONA 2: SETUP TIRO -->
-    <div class="setup-area" id="setup-area">
-        <div class="badge-row">
-            <button id="btn-position" onclick="togglePosition()">T</button>
-            <button id="display-series" class="accent" onclick="openSeriesModal()">1T ✏️</button>
-            <button id="btn-wind" class="secondary" onclick="openWindModal()">🚩 Vento</button>
-            <select id="mode-select">
-                <option value="Azzeramento">🔧 Azzer.</option>
-            <option value="Gara">🏁 Gara</option>
-            <option value="L2">📊 L2</option>
-            <option value="L3">📊 L3</option>
-            <option value="L4">📊 L4</option>
-            <option value="Solo Sparo">🎯 Solo Sparo</option>
-            <option value="Altro">📝 Altro</option>
-            </select>
-        </div>
+    <div class="target-context">
+     <span id="session-label">
+      Sessione
+     </span>
+     <button class="text-button" id="wind-open">
+      Vento: calmo
+     </button>
     </div>
-
-    <!-- ZONA 3: BERSAGLIO E SLIDER -->
-    <div class="target-container">
-        <div class="target-box" id="target-box">
-            <div class="target-center">
-                <div class="target-cross-h"></div>
-                <div class="target-cross-v"></div>
-                <div class="target-prone"></div>
-                <div class="target-dot"></div>
-            </div>
-        </div>
+   </header>
+   <section aria-label="Registrazione dei colpi" class="target-section">
+    <div aria-label="Bersaglio. Tocca per inserire un colpo." class="target-box" id="target-box" role="group">
+     <div aria-hidden="true" class="target-center">
+      <div class="cross horizontal">
+      </div>
+      <div class="cross vertical">
+      </div>
+      <div class="prone-ring">
+      </div>
+      <div class="center-dot">
+      </div>
+     </div>
+     <div id="shots-layer">
+     </div>
+     <div aria-hidden="true" class="aim-preview" hidden="" id="aim-preview">
+     </div>
+     <div class="touch-cover" hidden="" id="touch-cover">
+      <strong>
+       Comandi bloccati
+      </strong>
+      <span>
+       Usa “Sblocca” sotto il bersaglio.
+      </span>
+     </div>
     </div>
-
-    <div class="slider-container">
-        <input type="range" id="time-slider" min="0" max="0" value="0" step="1">
-        <span id="slider-val">0 / 0</span>
+   </section>
+   <section aria-label="Comandi della serie" class="field-controls">
+    <div class="shot-summary">
+     <strong id="shot-count">
+      0 / 5 colpi
+     </strong>
+     <span id="hit-count">
+      0 centri
+     </span>
+     <button aria-pressed="false" class="text-button" id="edit-button">
+      Modifica colpi
+     </button>
     </div>
-
-    <!-- ZONA 4: GESTIONE ERRORI -->
-    <div class="action-row" id="action-row">
-        <button class="secondary" onclick="undoLastShot()">↩️ Annulla Colpo</button>
-        <button class="danger" onclick="clearTargetAndState()">🗑️ Reset</button>
+    <div aria-label="Seleziona un colpo da modificare" class="shot-picker" hidden="" id="shot-picker">
     </div>
-
-    <!-- ZONA 5: BOTTOM BAR (SALVATAGGIO) -->
-    <div class="bottom-bar" id="bottom-bar">
-        <button class="btn-storico" onclick="openHistory()">Storico</button>
-        <button class="accent btn-huge" onclick="saveSeries()">💾 SALVA</button>
+    <p class="helper" hidden="" id="edit-help">
+     Seleziona il numero del colpo, poi tocca il punto corretto sul bersaglio. Puoi anche trascinarlo.
+    </p>
+    <div class="review-info" hidden="" id="review-info">
     </div>
-
-    <div class="controls hidden" id="review-controls">
-        <button style="background-color: #fff; color: #000;" onclick="exitReviewMode()">⬅ Torna all'Allenamento</button>
+    <label class="helper" for="review-slider" hidden="" id="review-slider-label">
+     Mostra i colpi in ordine
+    </label>
+    <input hidden="" id="review-slider" max="0" min="0" type="range" value="0"/>
+    <div class="primary-actions" id="entry-actions">
+     <button class="secondary" id="undo-button">
+      Annulla colpo
+     </button>
+     <button class="primary" id="save-button">
+      Salva serie
+     </button>
     </div>
-
-    <!-- Modale Modifica Posizione & Numero Serie -->
-    <div class="modal-overlay" id="series-modal">
-        <div class="modal">
-            <h3>🎯 Imposta Serie e Posizione</h3>
-            <p id="series-modal-desc" style="font-size: 13px; color: #ccc; margin-top: 0;"></p>
-            
-            <label style="font-size: 12px; font-weight: bold; color: #aaa;">POSIZIONE</label>
-            <div class="pos-segmented">
-                <button type="button" id="seg-btn-t" onclick="setModalPosition('T')">Terra (T)</button>
-                <button type="button" id="seg-btn-p" onclick="setModalPosition('P')">Piedi (P)</button>
-            </div>
-
-            <label style="font-size: 12px; font-weight: bold; color: #aaa; margin-top: 10px;">NUMERO SERIE</label>
-            <div class="stepper-container">
-                <button type="button" class="secondary stepper-btn" onclick="stepSeries(-1)">−</button>
-                <div class="stepper-value" id="series-stepper-val">1T</div>
-                <button type="button" class="secondary stepper-btn" onclick="stepSeries(1)">+</button>
-            </div>
-
-            <div class="input-row">
-                <button type="button" class="secondary" onclick="closeSeriesModal()">Annulla</button>
-                <button type="button" class="accent" onclick="applySeriesChange()">Conferma</button>
-            </div>
-        </div>
+    <div class="secondary-actions">
+     <button class="secondary" id="history-open">
+      Storico
+     </button>
+     <button aria-pressed="false" class="secondary" id="lock-button">
+      Blocca
+     </button>
+     <button class="text-button danger-text" id="clear-button">
+      Svuota serie
+     </button>
     </div>
-
-    <!-- Modale Impostazioni -->
-    <div class="modal-overlay" id="settings-modal" onclick="if(event.target === this) closeSettings()">
-        <div class="modal">
-            <h3>⚙️ Impostazioni App</h3>
-            <button class="secondary" onclick="toggleCloudConfig()" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>☁️ Configura Cloud & Firma</span><span>▼</span>
-            </button>
-            <div class="cloud-content section-box" id="cloud-config-panel">
-                <label>LA TUA FIRMA (ALLENATORE)</label>
-                <!-- Tolto onchange: il salvataggio avviene in tempo reale via JS -->
-                <input type="text" id="coach-name" placeholder="Es. Matteo Finco">
-                <label style="margin-top: 10px;">URL GOOGLE SHEETS</label>
-                <!-- Tolto onchange: il salvataggio avviene in tempo reale via JS -->
-                <input type="url" id="sheet-url" placeholder="https://script.google.com/...">
-                <label style="margin-top: 10px;">URL DASHBOARD LOOKER STUDIO</label>
-                <input type="url" id="looker-url" placeholder="https://lookerstudio.google.com/...">
-            </div>
-
-            <h3 style="margin-top: 10px;">Archivio Atleti</h3>
-            <div class="input-row">
-                <input type="text" id="new-athlete-name" placeholder="Nuovo atleta...">
-                <button onclick="addAthlete()">Aggiungi</button>
-            </div>
-            <ul class="list-container" id="modal-athlete-list" style="max-height: 220px; overflow-y: auto;"></ul>
-            
-            <div class="compact-btns">
-                <button class="accent" onclick="pullRosterFromCloud()">🔄 Sincronizza atleti download</button>
-            </div>
-
-            <div class="compact-btns">
-                <button class="danger" onclick="factoryReset()">⚠️ Reset Totale</button>
-            </div>
-            <button class="secondary" onclick="closeSettings()" style="margin-top: 10px;">Chiudi</button>
-        </div>
+    <div class="primary-actions" hidden="" id="review-actions">
+     <button class="primary" id="review-exit">
+      Torna all’allenamento
+     </button>
     </div>
-
-    <!-- Modale Nuova Sessione -->
-    <div class="modal-overlay" id="new-session-modal">
-        <div class="modal">
-            <h3>🔄 Inizia Nuova Sessione</h3>
-            <p style="font-size: 13px; color: #ccc; margin-top: 0;">Seleziona gli atleti presenti al poligono oggi. I contatori ripartiranno da 1.</p>
-            <div class="checklist" id="session-checklist"></div>
-            <div class="input-row">
-                <button class="secondary" onclick="closeNewSessionModal()">Annulla</button>
-                <button class="accent" onclick="startNewSession()">Avvia Sessione</button>
-            </div>
-        </div>
+    <p aria-live="polite" class="storage-status" id="storage-status" role="status">
+     Apertura archivio locale…
+    </p>
+    <button aria-label="Apri stato di sincronizzazione" class="sync-status" id="sync-status">
+     Verifica connessione…
+    </button>
+    <p aria-live="polite" class="notice" hidden="" id="notice" role="status">
+    </p>
+   </section>
+  </main>
+  <section aria-live="polite" class="startup" id="startup">
+   <h1>
+    Biathlon Tracker
+   </h1>
+   <p id="startup-message">
+    Apertura dei dati sul dispositivo…
+   </p>
+   <button hidden="" id="recovery-export">
+    Esporta dati per recupero
+   </button>
+   <button hidden="" id="reload-button">
+    Riprova
+   </button>
+  </section>
+  <dialog aria-labelledby="menu-title" id="menu-dialog">
+   <div class="dialog-heading">
+    <h2 id="menu-title">
+     Menu
+    </h2>
+    <button aria-label="Chiudi menu" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content menu-grid">
+    <button data-open="session-dialog">
+     Nuova sessione
+    </button>
+    <button data-open="settings-dialog">
+     Impostazioni e atleti
+    </button>
+    <button id="sync-now">
+     Sincronizza adesso
+    </button>
+    <button data-open="summary-dialog">
+     Riepilogo sul dispositivo
+    </button>
+    <button id="dashboard-open">
+     Statistiche online
+    </button>
+    <button aria-pressed="false" id="wake-button">
+     Mantieni schermo acceso
+    </button>
+    <button hidden="" id="update-button">
+     Aggiornamento disponibile
+    </button>
+    <p class="helper" id="menu-sync-info">
+    </p>
+    <p class="helper" id="offline-ready">
+     Preparazione dell’uso senza connessione…
+    </p>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="settings-title" id="settings-dialog">
+   <div class="dialog-heading">
+    <h2 id="settings-title">
+     Impostazioni
+    </h2>
+    <button aria-label="Chiudi impostazioni" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content">
+    <form id="settings-form">
+     <label for="coach-name">
+      Firma allenatore
+     </label>
+     <input autocomplete="name" id="coach-name" maxlength="120" type="text"/>
+     <label for="cloud-url">
+      Indirizzo Google Apps Script
+     </label>
+     <input id="cloud-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" type="url"/>
+     <label for="api-token">
+      Chiave personale allenatore
+     </label>
+     <input autocomplete="off" id="api-token" type="password"/>
+     <label for="looker-url">
+      Indirizzo statistiche Looker Studio
+     </label>
+     <input id="looker-url" inputmode="url" type="url"/>
+     <div class="form-grid">
+      <div>
+       <label for="shot-limit">
+        Limite colpi: da 1 a 50
+       </label>
+       <input id="shot-limit" inputmode="numeric" max="50" min="1" required="" step="1" type="number" value="5"/>
+      </div>
+      <div>
+       <label for="theme-select">
+        Aspetto
+       </label>
+       <select id="theme-select">
+        <option value="day">
+         Chiaro da esterno
+        </option>
+        <option value="night">
+         Scuro
+        </option>
+       </select>
+      </div>
+     </div>
+     <label for="shot-color-select">
+      Marcatori dei colpi
+     </label>
+     <select id="shot-color-select">
+      <option value="color">
+       Colori con simboli
+      </option>
+      <option value="white">
+       Bianco e nero ad alto contrasto
+      </option>
+     </select>
+     <button type="submit">
+      Salva impostazioni
+     </button>
+    </form>
+    <hr/>
+    <h3>
+     Archivio atleti
+    </h3>
+    <form class="add-athlete" id="athlete-form">
+     <label class="sr-only" for="new-athlete">
+      Nome del nuovo atleta
+     </label>
+     <input id="new-athlete" maxlength="120" placeholder="Nome e cognome" required="" type="text"/>
+     <button type="submit">
+      Aggiungi
+     </button>
+    </form>
+    <ul class="record-list" id="roster-list">
+    </ul>
+    <button class="secondary" id="roster-download">
+     Scarica atleti da Google
+    </button>
+    <hr/>
+    <h3>
+     Backup e recupero
+    </h3>
+    <p class="helper">
+     Il backup conserva sessioni, serie, bozze e operazioni da inviare. La chiave di accesso va reinserita dopo il ripristino.
+    </p>
+    <button class="secondary" id="backup-export">
+     Esporta backup
+    </button>
+    <label class="file-button secondary" for="backup-file">
+     Ripristina un backup
+    </label>
+    <input accept="application/json,.json" class="sr-only" id="backup-file" type="file"/>
+    <button class="danger" id="factory-reset">
+     Reset totale del dispositivo
+    </button>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="session-title" id="session-dialog">
+   <div class="dialog-heading">
+    <h2 id="session-title">
+     Nuova sessione
+    </h2>
+    <button aria-label="Chiudi nuova sessione" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content">
+    <p>
+     Seleziona gli atleti presenti. Storico, bozze precedenti e dati da inviare saranno conservati.
+    </p>
+    <div class="checklist" id="session-checklist">
     </div>
-
-    <!-- Modale Storico A Imbuto -->
-    <div class="modal-overlay" id="history-modal">
-        <div class="modal">
-            <div id="history-step-1">
-                <h3>Storico: Seleziona Atleta</h3>
-                <ul class="list-container" id="history-athlete-list"></ul>
-                <button class="secondary" onclick="closeHistory()" style="margin-top: 10px;">Chiudi</button>
-            </div>
-
-            <div id="history-step-2" class="hidden">
-                <h3>Storico <span id="history-athlete-name" style="color: var(--accent);"></span></h3>
-                <ul class="list-container" id="modal-history-list"></ul>
-                <div class="input-row" style="margin-top: 10px;">
-                    <button class="secondary" onclick="backToHistoryAthletes()">⬅ Indietro</button>
-                    <button class="secondary" onclick="closeHistory()">Chiudi</button>
-                </div>
-            </div>
-        </div>
+    <button id="session-start">
+     Avvia sessione
+    </button>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="wind-title" id="wind-dialog">
+   <div class="dialog-heading">
+    <h2 id="wind-title">
+     Condizioni del vento
+    </h2>
+    <button aria-label="Annulla modifica del vento" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content">
+    <p class="helper">
+     Le frecce indicano dove soffia il vento: ↑ verso i bersagli, ↓ verso la piazzola.
+    </p>
+    <div class="compass" id="wind-directions">
     </div>
-
-    <!-- Modale Vento -->
-    <div class="modal-overlay" id="wind-modal" onclick="if(event.target === this) cancelWindModal()">
-        <div class="modal">
-            <h3>🌬️ Condizioni Vento</h3>
-
-            <div class="wind-panel">
-                <div>
-                    <label style="display: block; font-size: 12px; font-weight: bold; color: #aaa; text-align: center;">INTENSITÀ</label>
-                    <div class="wind-intensity-control" aria-label="Intensità del vento">
-                        <div class="wind-scale">
-                            <button class="wind-level" data-level="5" onclick="selectWindIntensity(5)" aria-label="Livello 6"></button>
-                            <button class="wind-level" data-level="4" onclick="selectWindIntensity(4)" aria-label="Livello 5"></button>
-                            <button class="wind-level" data-level="3" onclick="selectWindIntensity(3)" aria-label="Livello 4"></button>
-                            <button class="wind-level" data-level="2" onclick="selectWindIntensity(2)" aria-label="Livello 3"></button>
-                            <button class="wind-level" data-level="1" onclick="selectWindIntensity(1)" aria-label="Livello 2"></button>
-                            <button class="wind-level" data-level="0" onclick="selectWindIntensity(0)" aria-label="Livello 1"></button>
-                            <span id="wind-flag" class="wind-flag" aria-hidden="true"><span class="flag-pole"></span><span class="flag-cloth"></span></span>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label style="display: block; font-size: 12px; font-weight: bold; color: #aaa; text-align: center;">DIREZIONE</label>
-                    <p style="font-size: 11px; color:#888; text-align:center; margin:0;">↑ Verso bersagli | ↓ Verso piazzola</p>
-
-                    <div class="compass-grid">
-                        <button class="dir-btn" data-dir="NW" onclick="selectWindDir('NW')">↖</button>
-                        <button class="dir-btn" data-dir="N" onclick="selectWindDir('N')">↑</button>
-                        <button class="dir-btn" data-dir="NE" onclick="selectWindDir('NE')">↗</button>
-                        <button class="dir-btn" data-dir="W" onclick="selectWindDir('W')">←</button>
-                        <button class="dir-btn" data-dir="C" onclick="selectWindDir('C')">C</button>
-                        <button class="dir-btn" data-dir="E" onclick="selectWindDir('E')">→</button>
-                        <button class="dir-btn" data-dir="SW" onclick="selectWindDir('SW')">↙</button>
-                        <button class="dir-btn" data-dir="S" onclick="selectWindDir('S')">↓</button>
-                        <button class="dir-btn" data-dir="SE" onclick="selectWindDir('SE')">↘</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="wind-actions" style="margin-top: 8px;">
-                <button class="secondary" onclick="cancelWindModal()">Annulla</button>
-                <button class="accent" onclick="closeWindModal()">Conferma</button>
-            </div>
-        </div>
+    <h3>
+     Intensità osservata
+    </h3>
+    <div class="wind-levels" id="wind-levels">
     </div>
-
-    <script>
-        const MAX_SHOTS = 8;
-        const STORAGE_KEY = 'biathlon_tracker_data_v5';
-        const TRAINING_MODES = ["Azzeramento", "Gara", "L2", "L3", "L4", "Solo Sparo", "Altro"];
-
-        // --- DATABASE OFFLINE (IndexedDB) ---
-        const idb = {
-            dbName: 'BiathlonTrackerDB',
-            version: 1,
-            storeName: 'appState',
-            
-            async getDb() {
-                return new Promise((resolve, reject) => {
-                    const request = indexedDB.open(this.dbName, this.version);
-                    request.onerror = () => reject(request.error);
-                    request.onsuccess = () => resolve(request.result);
-                    request.onupgradeneeded = (e) => {
-                        e.target.result.createObjectStore(this.storeName);
-                    };
-                });
-            },
-            async get(key) {
-                const db = await this.getDb();
-                return new Promise((resolve, reject) => {
-                    const tx = db.transaction(this.storeName, 'readonly');
-                    const request = tx.objectStore(this.storeName).get(key);
-                    request.onsuccess = () => resolve(request.result);
-                    request.onerror = () => reject(request.error);
-                });
-            },
-            async set(key, value) {
-                const db = await this.getDb();
-                return new Promise((resolve, reject) => {
-                    const tx = db.transaction(this.storeName, 'readwrite');
-                    const request = tx.objectStore(this.storeName).put(value, key);
-                    request.onsuccess = () => resolve();
-                    request.onerror = () => reject(request.error);
-                });
-            }
-        };
-
-        let state = {
-            coachName: "", cloudUrl: "", lookerUrl: "", roster: [ { id: 1, name: "Atleta di Test" } ],
-            activeAthletes: [ { id: 1, name: "Atleta di Test", seriesT: 1, seriesP: 1 } ],
-            currentAthleteId: 1, currentPos: 'T', currentMode: 'Allenamento', shotColor: 'color', currentWind: { dir: 'C', int: 0 },
-            currentShots: [], history: [], syncQueue: [], deleteQueue: [], reviewMode: null,
-            sessionTimestamp: Date.now() // Nuova variabile per il controllo assoluto del tempo
-        };
-
-        // loadState diventa asincrono
-        async function loadState() {
-            try {
-                let p = await idb.get('main_state');
-                
-                // MIGRATION: Se IDB è vuoto, recupera i vecchi dati da localStorage
-                if (!p) {
-                    const saved = localStorage.getItem(STORAGE_KEY);
-                    if (saved) {
-                        p = JSON.parse(saved);
-                        console.log("Migrazione da localStorage a IndexedDB completata.");
-                    }
-                }
-
-                if (p) {
-                    state.coachName = p.coachName || ""; 
-                    state.cloudUrl = p.cloudUrl || "";
-                    state.lookerUrl = p.lookerUrl || "";
-                    if (p.roster) state.roster = p.roster;
-                    if (p.activeAthletes) state.activeAthletes = p.activeAthletes;
-                    state.currentAthleteId = p.currentAthleteId; 
-                    state.currentPos = p.currentPos || 'T'; 
-                    state.currentMode = p.currentMode || 'Allenamento';
-                    state.currentWind = p.currentWind || { dir: 'C', int: 0 };
-                    state.shotColor = p.shotColor === 'white' ? 'white' : 'color';
-                    state.currentShots = p.currentShots || []; 
-                    state.history = p.history || []; 
-                    state.syncQueue = p.syncQueue || []; 
-                    state.deleteQueue = p.deleteQueue || [];
-                    state.sessionTimestamp = p.sessionTimestamp || Date.now();
-                } else {
-                    forceDefaultAthlete();
-                }
-            } catch (e) {
-                console.error("Errore caricamento stato:", e);
-                forceDefaultAthlete();
-            }
-
-            // Controlli di integrità post-caricamento
-            if(!state.activeAthletes.find(a => a.id === state.currentAthleteId)) {
-                if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
-            }
-            state.activeAthletes.forEach(ensureSeriesCounters);
-        }
-
-        let modalSelectedPos = 'T'; let modalSeriesValues = { T: 1, P: 1 }; let windModalInitial = null;
-        const targetEl = document.getElementById('target-box');
-        const athleteSelect = document.getElementById('athlete-select');
-        const slider = document.getElementById('time-slider');
-        const sliderVal = document.getElementById('slider-val');
-        
-        let draggedShot = null; let isDragging = false; let longPressTimer = null; let silentSyncInProgress = false;
-
-        async function init() {
-            await loadState(); // Adesso aspettiamo che il DB risponda
-            refreshInterface();
-            
-            document.getElementById('coach-name').value = state.coachName;
-            document.getElementById('sheet-url').value = state.cloudUrl;
-            document.getElementById('looker-url').value = state.lookerUrl;
-
-            document.getElementById('shot-color-select').addEventListener('change', (e) => {
-                state.shotColor = e.target.value;
-                saveState();
-                applyShotColorTheme();
-            });
-            
-            document.getElementById('coach-name').addEventListener('input', (e) => {
-                state.coachName = e.target.value.trim();
-                saveState();
-            });
-            document.getElementById('sheet-url').addEventListener('input', (e) => {
-                state.cloudUrl = e.target.value.trim();
-                saveState();
-            });
-            document.getElementById('looker-url').addEventListener('input', (e) => {
-                state.lookerUrl = e.target.value.trim();
-                saveState();
-            });
-
-            slider.addEventListener('input', updateVisualsFromSlider);
-            document.querySelectorAll('.modal-overlay').forEach(overlay => {
-                overlay.addEventListener('touchmove', (e) => { if(e.target === overlay) e.preventDefault(); }, { passive: false });
-            });
-
-            checkStaleSession();
-        }
-
-
-        function checkStaleSession() {
-            const threeHours = 3 * 60 * 60 * 1000;
-
-            if (Date.now() - state.sessionTimestamp > threeHours) {
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        if (confirm("Sono passate più di 3 ore dall'ultima attività.\n\nVuoi avviare una Nuova Sessione azzerando i contatori?")) {
-                            openNewSessionModal();
-                        }
-                    }, 150); 
-                });
-            }
-        }
-        // Calcola la distanza e valuta l'esito
-        function evaluateShot(x, y, bx, by, pos) {
-            const normX = (x / bx) * 400;
-            const normY = (y / by) * 440;
-            const dist = Math.sqrt(Math.pow(normX - 200, 2) + Math.pow(normY - 220, 2));
-            const threshold = pos === 'T' ? 70.4 : 180;
-            return dist <= threshold;
-        }
-
-        function openModal(id) { document.getElementById(id).style.display = 'flex'; document.body.classList.add('modal-open'); }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; document.body.classList.remove('modal-open'); }
-        function getActiveShots() { return state.reviewMode ? state.reviewMode.shots : state.currentShots; }
-
-        function lockPortrait() {
-            if (window.screen && window.screen.orientation && typeof window.screen.orientation.lock === 'function') {
-                window.screen.orientation.lock('portrait-primary').catch(() => {});
-            }
-        }
-
-        function openDashboard() {
-            if (!state.lookerUrl || !state.lookerUrl.startsWith('http')) {
-                return alert("Configura prima il link della Dashboard Looker Studio nel Menu (Configura Cloud).");
-            }
-            window.open(state.lookerUrl, '_blank');
-        }
-
-        function toggleSideMenu() {
-            document.getElementById('side-menu-overlay').classList.toggle('open');
-        }
-
-        function closeSideMenu() {
-            document.getElementById('side-menu-overlay').classList.remove('open');
-        }
-
-        function openSettingsFromMenu() {
-            closeSideMenu();
-            openSettings();
-        }
-
-        function openDashboardFromMenu() {
-            closeSideMenu();
-            openDashboard();
-        }
-
-        function openNewSessionFromMenu() {
-            closeSideMenu();
-            openNewSessionModal();
-        }
-
-        function syncFromMenu() {
-            closeSideMenu();
-            syncWithCloud();
-        }
-
-        // --- GESTIONE VENTO ---
-        function openWindModal() {
-            windModalInitial = { ...state.currentWind };
-            updateWindUI(state.currentWind.dir);
-            openModal('wind-modal');
-        }
-
-        function closeWindModal() {
-            saveState();
-            updateWindBadge();
-            windModalInitial = null;
-            closeModal('wind-modal');
-        }
-
-        function cancelWindModal() {
-            if (windModalInitial) state.currentWind = { ...windModalInitial };
-            updateWindBadge();
-            windModalInitial = null;
-            closeModal('wind-modal');
-        }
-
-        function selectWindDir(dir) {
-            state.currentWind.dir = dir;
-            if (dir === 'C') {
-                state.currentWind.int = 0;
-            } else if (state.currentWind.int === 0) {
-                state.currentWind.int = 1;
-            }
-            updateWindUI();
-        }
-
-        function selectWindIntensity(level) {
-            state.currentWind.int = level;
-            if (level === 0) state.currentWind.dir = 'C';
-            if (level > 0 && state.currentWind.dir === 'C') state.currentWind.dir = 'N';
-            updateWindUI();
-        }
-
-        function updateWindUI(forceDir) {
-            if (forceDir) state.currentWind.dir = forceDir;
-
-            if (state.currentWind.int === 0) state.currentWind.dir = 'C';
-            if (state.currentWind.int > 0 && state.currentWind.dir === 'C') state.currentWind.dir = 'N';
-
-            document.querySelectorAll('.wind-level').forEach(level => {
-                level.classList.toggle('active', parseInt(level.dataset.level, 10) === state.currentWind.int);
-            });
-            const flag = document.getElementById('wind-flag');
-            const cloth = flag ? flag.querySelector('.flag-cloth') : null;
-            if (flag) flag.style.bottom = `${(state.currentWind.int / 5) * 100}%`;
-            if (cloth) {
-                const clothAngles = [90, 75, 60, 45, 25, 0];
-                cloth.style.transform = `rotate(${clothAngles[state.currentWind.int]}deg)`;
-            }
-            document.querySelectorAll('.dir-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.dir === state.currentWind.dir);
-            });
-        }
-
-        function updateWindBadge() {
-            const btn = document.getElementById('btn-wind');
-            if (!btn) return;
-            if (state.currentWind.int === 0) {
-                btn.textContent = '🚩 Vento';
-                btn.className = 'secondary';
-            } else {
-                const arrows = { N: '↑', NE: '↗', E: '→', SE: '↘', S: '↓', SW: '↙', W: '←', NW: '↖' };
-                btn.textContent = `🚩 ${arrows[state.currentWind.dir]} ${state.currentWind.int}`;
-                btn.className = 'accent';
-            }
-        }
-
-        // Aggiorniamo saveState per usare IndexedDB (fire-and-forget asincrono)
-        function saveState() {
-            idb.set('main_state', state).catch(err => console.error("Errore salvataggio IDB:", err));
-            updateSyncBadge(); 
-            if(!state.reviewMode) updateSliderMax();
-        }
-
-        function ensureSeriesCounters(athlete) {
-            if (!athlete.seriesByMode) athlete.seriesByMode = {};
-            TRAINING_MODES.forEach(mode => {
-                if (!athlete.seriesByMode[mode]) {
-                    athlete.seriesByMode[mode] = {
-                        T: mode === 'Azzeramento' ? (athlete.seriesT || 1) : 1,
-                        P: mode === 'Azzeramento' ? (athlete.seriesP || 1) : 1
-                    };
-                }
-            });
-        }
-
-        function getCurrentSeries(athlete, position = state.currentPos, mode = state.currentMode) {
-            ensureSeriesCounters(athlete);
-            return athlete.seriesByMode[mode]?.[position] || 1;
-        }
-
-        function forceDefaultAthlete() {
-            const id = Date.now();
-            state.roster = [{ id: id, name: "Atleta di Test" }]; state.activeAthletes = [{ id: id, name: "Atleta di Test", seriesT: 1, seriesP: 1 }];
-            state.currentAthleteId = id;
-        }
-
-        function refreshInterface() {
-            athleteSelect.innerHTML = '';
-            if(state.activeAthletes.length === 0) {
-                const opt = document.createElement('option'); opt.textContent = "-- Nessun atleta presente --";
-                athleteSelect.appendChild(opt); athleteSelect.disabled = true;
-            } else {
-                athleteSelect.disabled = false;
-                state.activeAthletes.forEach(a => {
-                    const opt = document.createElement('option'); opt.value = a.id; opt.textContent = a.name;
-                    if(a.id === state.currentAthleteId) opt.selected = true; athleteSelect.appendChild(opt);
-                });
-            }
-            athleteSelect.onchange = (e) => { state.currentAthleteId = parseInt(e.target.value); saveState(); updateHeader(); };
-            
-            const modeSelect = document.getElementById('mode-select');
-
-            // Controllo di sicurezza: se in memoria c'è ancora il vecchio "Allenamento", lo passiamo ad "Altro"
-            const validModes = TRAINING_MODES;
-            if (!validModes.includes(state.currentMode)) state.currentMode = "Azzeramento";
-
-            modeSelect.value = state.currentMode;
-            modeSelect.onchange = (e) => { 
-                state.currentMode = e.target.value; 
-                saveState();
-                updateHeader();
-            };
-
-            updateHeader(); renderShotsFromState(); toggleReviewUI(); applyShotColorTheme(); updateWindBadge(); updateSyncBadge();
-        }
-
-        function updateHeader() {
-            const badgeEl = document.getElementById('display-series');
-            const selectEl = document.getElementById('athlete-select');
-            if(state.reviewMode) {
-                if (selectEl) {
-                    selectEl.innerHTML = '';
-                    const option = document.createElement('option');
-                    option.textContent = state.reviewMode.athlete;
-                    option.selected = true;
-                    selectEl.appendChild(option);
-                    selectEl.disabled = true;
-                }
-                badgeEl.textContent = `Rev. ${state.reviewMode.series}`;
-                badgeEl.style.pointerEvents = 'none'; return;
-            }
-            if (selectEl) selectEl.disabled = false;
-            badgeEl.style.pointerEvents = 'auto';
-            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
-            if(!athlete) {
-                badgeEl.textContent = "-"; return;
-            }
-            const seriesNum = getCurrentSeries(athlete);
-            badgeEl.textContent = `${seriesNum}${state.currentPos} ✏️`;
-            document.getElementById('btn-position').textContent = state.currentPos;
-        }
-
-        function applyShotColorTheme() {
-            document.body.classList.remove('theme-shot-white', 'theme-shot-black');
-            if (state.shotColor === 'white') document.body.classList.add('theme-shot-white');
-            if (state.shotColor !== 'white' && state.shotColor !== 'color') state.shotColor = 'color';
-            document.getElementById('shot-color-select').value = state.shotColor;
-        }
-
-        function openSeriesModal() {
-            if(state.reviewMode || state.activeAthletes.length === 0) return;
-            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
-            if(!athlete) return;
-            ensureSeriesCounters(athlete);
-            modalSelectedPos = state.currentPos;
-            modalSeriesValues = { ...athlete.seriesByMode[state.currentMode] };
-            document.getElementById('series-modal-desc').textContent = athlete.name;
-            updateModalPosUI(); openModal('series-modal');
-        }
-        function closeSeriesModal() { closeModal('series-modal'); }
-        function setModalPosition(pos) { modalSelectedPos = pos; updateModalPosUI(); }
-        function updateModalPosUI() {
-            document.getElementById('seg-btn-t').classList.toggle('active', modalSelectedPos === 'T');
-            document.getElementById('seg-btn-p').classList.toggle('active', modalSelectedPos === 'P');
-            document.getElementById('series-stepper-val').textContent = `${modalSeriesValues[modalSelectedPos]}${modalSelectedPos}`;
-        }
-        function stepSeries(delta) { modalSeriesValues[modalSelectedPos] = Math.max(1, modalSeriesValues[modalSelectedPos] + delta); updateModalPosUI(); }
-        
-        function applySeriesChange() {
-            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
-            if(athlete) {
-                ensureSeriesCounters(athlete);
-                const selectedSeries = `${modalSeriesValues[modalSelectedPos]}${modalSelectedPos}`;
-                const existingSeries = state.history.find(h =>
-                    h.athleteId === athlete.id &&
-                    h.type === state.currentMode &&
-                    h.position === modalSelectedPos &&
-                    h.series === selectedSeries
-                );
-                if (existingSeries && !confirm(`La serie ${selectedSeries} esiste già. Sovrascriverla?`)) return;
-                if (existingSeries) removeHistoryItemFromState(existingSeries.id);
-                athlete.seriesByMode[state.currentMode] = { ...modalSeriesValues };
-                state.currentPos = modalSelectedPos; 
-                saveState(); 
-                updateHeader();
-                renderShotsFromState(); // Forza il ricalcolo dei colori
-            }
-            closeSeriesModal();
-        }
-
-        function togglePosition() { 
-            state.currentPos = state.currentPos === 'T' ? 'P' : 'T'; 
-            saveState(); 
-            updateHeader(); 
-            renderShotsFromState(); // Forza il ricalcolo dei colori
-        }
-        
-        function toggleMode() {
-            state.currentMode = state.currentMode === 'Allenamento' ? 'Azzeramento' : 'Allenamento';
-            saveState(); refreshInterface();
-        }
-
-        function toggleReviewUI() {
-            const isReview = state.reviewMode !== null;
-            document.body.classList.toggle('review-mode', isReview);
-            document.getElementById('top-bar').classList.toggle('hidden', isReview);
-            document.getElementById('setup-area').classList.toggle('hidden', isReview);
-            document.getElementById('action-row').classList.toggle('hidden', isReview);
-            document.getElementById('bottom-bar').classList.toggle('hidden', isReview);
-            document.getElementById('review-controls').classList.toggle('hidden', !isReview);
-        }
-
-        function toggleCloudConfig() { document.getElementById('cloud-config-panel').classList.toggle('active'); }
-
-        function updateSyncBadge() {
-            const count = state.syncQueue.length + state.deleteQueue.length;
-            const syncBtn = document.getElementById('sync-menu-button');
-            const syncDot = document.getElementById('sync-dot');
-            const hamburgerSyncDot = document.getElementById('hamburger-sync-dot');
-            if (syncDot) syncDot.classList.toggle('active', count > 0);
-            if (hamburgerSyncDot) hamburgerSyncDot.classList.toggle('active', count > 0);
-            if(syncBtn) {
-                if(count > 0) {
-                    syncBtn.className = 'secondary sync-menu-btn';
-                } else {
-                    syncBtn.className = 'secondary sync-menu-btn';
-                }
-            }
-        }
-
-        // FASE 2: Coda di sincronizzazione (Offline Queue) - Implementazione sicura
-        async function syncWithCloud() {
-            if(state.syncQueue.length === 0 && state.deleteQueue.length === 0) return alert("Tutti i dati sono già sincronizzati.");
-            if(!state.cloudUrl || !state.cloudUrl.startsWith('http')) return alert("Devi prima configurare l'URL nelle impostazioni.");
-            if(!state.coachName) return alert("Devi inserire la tua firma nelle impostazioni.");
-            
-            const btn = document.getElementById('sync-menu-button'); 
-            if (btn) btn.disabled = true;
-
-            const payload = { inserts: state.syncQueue, deletes: state.deleteQueue };
-
-            try {
-                const response = await fetch(state.cloudUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload)
-                });
-                const result = await response.json();
-                if(result.status === "success") {
-                    // INVIO RIUSCITO: Svuotiamo la coda e salviamo lo stato
-                    state.syncQueue = []; state.deleteQueue = []; saveState(); alert("Sincronizzazione completata!");
-                } else { alert("Errore dallo script: " + result.error); }
-            } catch (err) { 
-                // INVIO FALLITO: I dati restano bloccati in state.syncQueue in attesa del prossimo tentativo manuale.
-                alert("Rete assente o instabile. I dati sono al sicuro nel telefono, riprova appena la connessione migliora."); 
-            } finally { 
-                if (btn) btn.disabled = false; updateSyncBadge(); 
-            }
-        }
-
-        async function silentAutoSync() {
-            if (silentSyncInProgress || state.syncQueue.length === 0 && state.deleteQueue.length === 0) return;
-            if (!navigator.onLine || !state.cloudUrl || !state.cloudUrl.startsWith('http') || !state.coachName) return;
-
-            silentSyncInProgress = true;
-            const inserts = [...state.syncQueue];
-            const deletes = [...state.deleteQueue];
-            const payload = { inserts, deletes };
-
-            try {
-                const response = await fetch(state.cloudUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await response.json();
-
-                if (result.status === "success") {
-                    const insertedIds = new Set(inserts.map(item => item.id.toString()));
-                    const deletedIds = new Set(deletes.map(id => id.toString()));
-                    state.syncQueue = state.syncQueue.filter(item => !insertedIds.has(item.id.toString()));
-                    state.deleteQueue = state.deleteQueue.filter(id => !deletedIds.has(id.toString()));
-                    saveState();
-                    updateSyncBadge();
-                }
-            } catch (err) {
-                // Lascia le code intatte: il prossimo evento online o il comando manuale riprovera.
-            } finally {
-                silentSyncInProgress = false;
-            }
-        }
-
-        function openNewSessionModal() { 
-            const list = document.getElementById('session-checklist'); list.innerHTML = '';
-            state.roster.forEach(athlete => {
-                const isCurrentlyActive = state.activeAthletes.some(a => a.id === athlete.id);
-                const label = document.createElement('label');
-                label.innerHTML = `<input type="checkbox" value="${athlete.id}" ${isCurrentlyActive ? 'checked' : ''}> ${athlete.name}`;
-                list.appendChild(label);
-            });
-            openModal('new-session-modal');
-        }
-        function closeNewSessionModal() { closeModal('new-session-modal'); }
-        
-        function startNewSession() {
-            if(state.currentShots.length > 0 && !confirm("Hai colpi non salvati sul bersaglio. Procedere comunque?")) return;
-            const checkboxes = document.querySelectorAll('#session-checklist input[type="checkbox"]:checked');
-            const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
-            state.history = []; state.currentShots = []; state.reviewMode = null; state.currentMode = 'Allenamento';
-            state.activeAthletes = state.roster.filter(a => selectedIds.includes(a.id)).map(a => ({ id: a.id, name: a.name, seriesT: 1, seriesP: 1 }));
-            if(state.activeAthletes.length > 0) state.currentAthleteId = state.activeAthletes[0].id;
-            
-            state.sessionTimestamp = Date.now(); // Resetta il timer
-            
-            saveState(); refreshInterface(); closeNewSessionModal();
-        }
-
-        function saveSeries() {
-            if(state.activeAthletes.length === 0) return alert("Nessun atleta selezionato.");
-            if (state.currentShots.length === 0) return alert("Nessun colpo.");
-            
-            const athlete = state.activeAthletes.find(a => a.id === state.currentAthleteId);
-            const exportW = 400; const exportH = 440;
-            const normalizedShots = state.currentShots.map(s => {
-                const scaleX = s.bx ? (exportW / s.bx) : 1; const scaleY = s.by ? (exportH / s.by) : 1;
-                const nx = Math.round(s.x * scaleX);
-                const ny = Math.round(s.y * scaleY);
-                const dist = Math.round(Math.sqrt(Math.pow(nx - 200, 2) + Math.pow(ny - 220, 2)));
-                const threshold = state.currentPos === 'T' ? 70.4 : 180;
-                
-                return { 
-                    seq: s.seq, 
-                    x: nx, 
-                    y: ny, 
-                    distanza: dist, 
-                    esito: (dist <= threshold) ? 'Bersaglio' : 'Errore' 
-                };
-            });
-            const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-            const timestampIso = new Date().toISOString();
-            const seriesLabel = `${getCurrentSeries(athlete)}${state.currentPos}`;
-
-            const dataPacket = {
-                id: uniqueId, type: state.currentMode, athleteId: athlete.id, athlete: athlete.name, position: state.currentPos,
-                series: seriesLabel, windDir: state.currentWind.dir, windInt: state.currentWind.int,
-                shots: JSON.parse(JSON.stringify(state.currentShots)), timestamp: timestampIso
-            };
-            
-            const cloudPacket = {
-                id: uniqueId, type: state.currentMode, timestamp: timestampIso, coach: state.coachName || "Non specificato", 
-                athlete: athlete.name, position: state.currentPos, series: seriesLabel,
-                windDir: state.currentWind.dir, windInt: state.currentWind.int, shots: normalizedShots
-            };
-
-            state.history.push(dataPacket); state.syncQueue.push(cloudPacket);
-            ensureSeriesCounters(athlete);
-            athlete.seriesByMode[state.currentMode][state.currentPos]++;
-            
-            state.sessionTimestamp = Date.now(); // Mantieni la sessione viva
-            
-            clearTargetAndState(true); updateHeader();
-            silentAutoSync();
-        }
-
-        function openSettings() { renderRosterList(); openModal('settings-modal'); }
-        function closeSettings() { closeModal('settings-modal'); }
-        function renderRosterList() { 
-            const list = document.getElementById('modal-athlete-list'); list.innerHTML = '';
-            state.roster.forEach(a => {
-                const li = document.createElement('li'); li.className = 'list-item';
-                li.innerHTML = `<span>${a.name}</span> <button class="danger btn-delete" onclick="removeAthlete(${a.id})">X</button>`;
-                list.appendChild(li);
-            });
-        }
-        function addAthlete() { const input = document.getElementById('new-athlete-name'); const name = input.value.trim(); if(!name) return; state.roster.push({ id: Date.now(), name: name }); input.value = ''; saveState(); renderRosterList(); }
-        function removeAthlete(id) { if(!confirm("Rimuovere definitivamente?")) return; state.roster = state.roster.filter(a => a.id !== id); state.activeAthletes = state.activeAthletes.filter(a => a.id !== id); saveState(); renderRosterList(); refreshInterface(); }
-
-        async function pullRosterFromCloud() {
-            if (!state.cloudUrl || !state.cloudUrl.startsWith('http')) {
-                return alert("Devi prima inserire l'URL dello script Google nelle impostazioni.");
-            }
-            if (state.roster.length > 0 && !confirm("Questo sovrascriverà la lista locale con quella presente nel foglio Google. Continuare?")) return;
-
-            try {
-                const response = await fetch(state.cloudUrl, { cache: 'no-store' });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                if (data.status !== "success" || !Array.isArray(data.roster) || data.roster.length === 0) {
-                    return alert("Errore: " + (data.error || "Nessun atleta trovato nel tab Anagrafica."));
-                }
-
-                const previousAthletes = new Map(state.activeAthletes.map(a => [String(a.id), a]));
-                state.roster = data.roster
-                    .filter(a => a && a.name)
-                    .map(a => ({ id: a.id, name: a.name.toString().trim() }))
-                    .filter(a => a.name);
-                if (state.roster.length === 0) return alert("Errore: il roster ricevuto non contiene nomi validi.");
-                state.activeAthletes = state.roster.map(a => {
-                    const previous = previousAthletes.get(String(a.id));
-                    return previous ? { ...previous, id: a.id, name: a.name } : { id: a.id, name: a.name, seriesT: 1, seriesP: 1 };
-                });
-                state.activeAthletes.forEach(ensureSeriesCounters);
-                if (!state.activeAthletes.some(a => a.id === state.currentAthleteId)) state.currentAthleteId = state.activeAthletes[0].id;
-
-                saveState();
-                renderRosterList();
-                refreshInterface();
-                alert(`Archivio aggiornato: caricati ${state.roster.length} atleti!`);
-            } catch (err) {
-                alert("Impossibile contattare il server. Verifica la connessione, il deploy doGet e l'URL.");
-            }
-        }
-
-        function factoryReset() { 
-            if(!confirm("ATTENZIONE: Reset totale? Tutti i dati non sincronizzati andranno persi definitivamente.")) return; 
-            
-            // Pulisce il vecchio storage per sicurezza
-            localStorage.removeItem(STORAGE_KEY); 
-            
-            // Elimina fisicamente il database IndexedDB
-            const req = indexedDB.deleteDatabase(idb.dbName);
-            req.onsuccess = () => location.reload();
-            req.onerror = () => { 
-                console.error("Impossibile eliminare il DB"); 
-                location.reload(); 
-            };
-        }
-
-
-        // --- NUOVO STORICO A IMBUTO ---
-        function openHistory() {
-            if(state.history.length === 0) return alert("Nessuna serie salvata oggi in questa sessione.");
-
-            const athletesInHistory = [...new Set(state.history.map(h => h.athleteId))];
-            const list = document.getElementById('history-athlete-list');
-            list.innerHTML = '';
-
-            athletesInHistory.forEach(id => {
-                const athleteName = state.history.find(h => h.athleteId === id).athlete;
-                const li = document.createElement('li');
-                li.className = 'list-item';
-
-                const name = document.createElement('span');
-                name.textContent = athleteName;
-                const button = document.createElement('button');
-                button.className = 'history-athlete-btn';
-                button.textContent = '→';
-                button.title = 'Vedi serie';
-                button.setAttribute('aria-label', `Vedi serie di ${athleteName}`);
-                button.addEventListener('click', () => showAthleteHistory(id, athleteName));
-
-                li.append(name, button);
-                list.appendChild(li);
-            });
-
-            document.getElementById('history-step-1').classList.remove('hidden');
-            document.getElementById('history-step-2').classList.add('hidden');
-            openModal('history-modal');
-        }
-
-        function showAthleteHistory(athleteId, athleteName) {
-            document.getElementById('history-athlete-name').textContent = athleteName;
-            const list = document.getElementById('modal-history-list');
-            list.innerHTML = '';
-
-            const athleteHistory = state.history.filter(h => h.athleteId === athleteId).reverse();
-            athleteHistory.forEach(h => {
-                const li = document.createElement('li');
-                li.className = 'list-item';
-                const date = new Date(h.timestamp);
-                const dateStr = `${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
-                const typeIcon = h.type === 'Azzeramento' ? '🔧' : '🎯';
-                const info = document.createElement('div');
-                info.className = 'list-item-info';
-                info.innerHTML = `<strong>${typeIcon} Serie ${h.series}</strong><span class="list-item-date">${dateStr} - ${h.shots.length} colpi</span>`;
-
-                const buttons = document.createElement('div');
-                buttons.className = 'list-item-btns';
-                const openButton = document.createElement('button');
-                openButton.textContent = 'Apri';
-                openButton.addEventListener('click', () => viewHistoryItem(h.id));
-                const deleteButton = document.createElement('button');
-                deleteButton.className = 'danger btn-delete';
-                deleteButton.textContent = 'X';
-                deleteButton.addEventListener('click', () => deleteHistoryItem(h.id));
-                buttons.append(openButton, deleteButton);
-
-                li.append(info, buttons);
-                list.appendChild(li);
-            });
-
-            document.getElementById('history-step-1').classList.add('hidden');
-            document.getElementById('history-step-2').classList.remove('hidden');
-        }
-
-        function backToHistoryAthletes() {
-            document.getElementById('history-step-1').classList.remove('hidden');
-            document.getElementById('history-step-2').classList.add('hidden');
-        }
-
-        function closeHistory() {
-            closeModal('history-modal');
-        }
-        
-        function removeHistoryItemFromState(id) {
-            const normalizedId = id.toString();
-            state.syncQueue = state.syncQueue.filter(q => q.id.toString() !== normalizedId);
-            state.history = state.history.filter(h => h.id.toString() !== normalizedId);
-            if (!state.deleteQueue.includes(normalizedId)) state.deleteQueue.push(normalizedId);
-        }
-
-        function deleteHistoryItem(id) {
-            if(!confirm("Eliminare? Questa azione rimuoverà i dati anche dal foglio Google in questo momento.")) return;
-
-            removeHistoryItemFromState(id);
-            saveState(); 
-            openHistory();
-            
-            // Innesca l'eliminazione sul cloud in background
-            silentAutoSync(); 
-        }
-        
-        function viewHistoryItem(id) { const item = state.history.find(h => h.id.toString() === id.toString()); if(!item) return; state.reviewMode = item; closeHistory(); refreshInterface(); }
-        function exitReviewMode() { state.reviewMode = null; refreshInterface(); }
-
-        // --- COSTANTI DI CALIBRAZIONE TOUCH (OTTIMIZZATO PER GUANTI INVERNALI) ---
-        const TOUCH_DRIFT_TOLERANCE = 30; // Aumentato da 10px a 30px per assorbire il jitter dell'impronta capacitiva
-        const DRAG_DELAY_MS = 800;        // Aumentato da 500ms a 800ms per ritardare l'innesco del drag accidentale
-
-        let tapStartTime = 0;
-        let tapStartCoords = { x: 0, y: 0 };
-        let potentialTap = false;
-
-        // --- 1. FRONTE DI SALITA (Pointer Down) ---
-        targetEl.addEventListener('pointerdown', (e) => {
-            if(state.reviewMode || state.activeAthletes.length === 0) return; 
-            if (parseInt(slider.value) < state.currentShots.length) { slider.value = state.currentShots.length; updateVisualsFromSlider(); }
-            
-            tapStartTime = Date.now();
-            tapStartCoords = { x: e.clientX, y: e.clientY };
-            potentialTap = true; 
-
-            if (e.target.classList.contains('shot')) {
-                potentialTap = false; 
-                const shotNode = e.target;
-                
-                longPressTimer = setTimeout(() => { 
-                    isDragging = true; 
-                    draggedShot = shotNode; 
-                    shotNode.classList.add('dragging'); 
-                    targetEl.setPointerCapture(e.pointerId); 
-                    if (navigator.vibrate) navigator.vibrate(50); 
-                }, DRAG_DELAY_MS);
-            }
-        });
-
-        // --- 2. MOVIMENTO E LOGICA DI TRASCINAMENTO ---
-        targetEl.addEventListener('pointermove', (e) => {
-            if (potentialTap) {
-                const dist = Math.sqrt(Math.pow(e.clientX - tapStartCoords.x, 2) + Math.pow(e.clientY - tapStartCoords.y, 2));
-                // Se lo spostamento supera la nuova tolleranza, annulla il tap
-                if (dist > TOUCH_DRIFT_TOLERANCE) potentialTap = false;
-            }
-
-            if (isDragging && draggedShot && !state.reviewMode) {
-                const rect = targetEl.getBoundingClientRect();
-                let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width)); 
-                let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
-                draggedShot.style.left = `${x}px`; draggedShot.style.top = `${y}px`;
-                
-                const seqIndex = parseInt(draggedShot.dataset.seq) - 1;
-                state.currentShots[seqIndex].x = x; 
-                state.currentShots[seqIndex].y = y;
-
-                const isHit = evaluateShot(x, y, targetEl.offsetWidth, targetEl.offsetHeight, state.currentPos);
-                if(isHit) {
-                    draggedShot.classList.replace('miss', 'hit') || draggedShot.classList.add('hit');
-                } else {
-                    draggedShot.classList.replace('hit', 'miss') || draggedShot.classList.add('miss');
-                }
-                updateShotContrast(draggedShot, x, y);
-            }
-        });
-
-        // --- 3. FRONTE DI DISCESA (Pointer Up) ---
-        const handlePointerUp = (e) => {
-            const elapsedTime = Date.now() - tapStartTime;
-
-            if (longPressTimer) {
-                clearTimeout(longPressTimer); 
-                longPressTimer = null;
-            }
-
-            if (isDragging && draggedShot) {
-                draggedShot.classList.remove('dragging'); 
-                targetEl.releasePointerCapture(e.pointerId); 
-                draggedShot = null; 
-                isDragging = false; 
-                saveState(); 
-            } else if (potentialTap && elapsedTime <= DRAG_DELAY_MS) {
-                if (e.target.id === 'target-box' || e.target.closest('.target-center')) {
-                    if (state.currentShots.length >= MAX_SHOTS) return;
-                    const rect = targetEl.getBoundingClientRect(); 
-                    createShot(e.clientX - rect.left, e.clientY - rect.top);
-                }
-            }
-            
-            potentialTap = false;
-        };
-
-        targetEl.addEventListener('pointerup', handlePointerUp); 
-        targetEl.addEventListener('pointercancel', handlePointerUp);
-
-        function undoLastShot() { if (state.reviewMode || state.currentShots.length === 0) return; state.currentShots.pop(); saveState(); renderShotsFromState(); }
-
-        // --- 3. CREAZIONE E RENDERING PULITI ---
-        function createShot(x, y) {
-            const seq = state.currentShots.length + 1;
-            state.currentShots.push({ seq, x, y, bx: targetEl.offsetWidth, by: targetEl.offsetHeight });
-            saveState(); 
-            appendShotDOM(seq, x, y, state.currentPos); 
-            slider.value = state.currentShots.length; updateVisualsFromSlider();
-        }
-
-        function updateShotContrast(shotEl, x, y) {
-            shotEl.classList.remove('on-dark');
-            if (state.shotColor !== 'white') return;
-
-            const width = targetEl.offsetWidth;
-            const height = targetEl.offsetHeight;
-            const radius = width * 0.45;
-            const dx = x - width / 2;
-            const dy = y - height / 2;
-            if ((dx * dx) / (radius * radius) + (dy * dy) / (radius * radius) <= 1) {
-                shotEl.classList.add('on-dark');
-            }
-        }
-
-        function appendShotDOM(seq, x, y, pos) {
-            const shotEl = document.createElement('div'); 
-            shotEl.className = 'shot'; 
-            shotEl.dataset.seq = seq;
-            shotEl.style.left = `${x}px`; 
-            shotEl.style.top = `${y}px`; 
-            shotEl.textContent = seq; 
-            
-            // Valutazione istantanea del colore
-            const isHit = evaluateShot(x, y, targetEl.offsetWidth, targetEl.offsetHeight, pos);
-            shotEl.classList.add(isHit ? 'hit' : 'miss');
-            updateShotContrast(shotEl, x, y);
-
-            targetEl.appendChild(shotEl);
-        }
-
-        function renderShotsFromState() {
-            targetEl.querySelectorAll('.shot').forEach(s => s.remove()); 
-            const shots = getActiveShots();
-            const currentPos = state.reviewMode ? state.reviewMode.position : state.currentPos;
-
-            shots.forEach(s => {
-                const currentW = targetEl.offsetWidth; const currentH = targetEl.offsetHeight;
-                const scaleX = s.bx ? (currentW / s.bx) : 1; const scaleY = s.by ? (currentH / s.by) : 1;
-                let renderX = s.x * scaleX; let renderY = s.y * scaleY;
-                if(!state.reviewMode) { s.x = renderX; s.y = renderY; s.bx = currentW; s.by = currentH; }
-                
-                appendShotDOM(s.seq, renderX, renderY, currentPos);
-            });
-            slider.value = shots.length; updateSliderMax(); updateVisualsFromSlider();
-        }
-
-        function updateSliderMax() { slider.max = getActiveShots().length; sliderVal.textContent = `${slider.value} / ${getActiveShots().length}`; }
-        function updateVisualsFromSlider() {
-            const visibleCount = parseInt(slider.value); sliderVal.textContent = `${visibleCount} / ${getActiveShots().length}`;
-            targetEl.querySelectorAll('.shot').forEach(shotEl => { shotEl.style.display = parseInt(shotEl.dataset.seq) <= visibleCount ? 'flex' : 'none'; });
-        }
-        function clearTargetAndState(skipConfirm = false) {
-            if (!skipConfirm && state.currentShots.length > 0 && !confirm("Cancellare tutti i colpi presenti sul bersaglio?")) return;
-            state.currentShots = [];
-            saveState();
-            renderShotsFromState();
-        }
-
-        window.addEventListener('resize', () => { if(getActiveShots().length > 0) renderShotsFromState(); });
-        
-        // 1. Ritardo di 5 secondi quando torna il Wi-Fi per far stabilizzare la rete
-        window.addEventListener('online', () => {
-            setTimeout(silentAutoSync, 5000);
-        });
-
-        // 2. Sincronizza in automatico e controlla la sessione quando riapri l'app
-        document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "visible") {
-                silentAutoSync();
-                checkStaleSession();
-            }
-        });       
-        
-        document.addEventListener('pointerdown', lockPortrait, { once: true });
-        lockPortrait();
-        init();
-    </script>
-</body>
+    <p class="helper">
+     0 = calmo · 5 = intensità massima della scala osservativa.
+    </p>
+    <button id="wind-save">
+     Conferma vento
+    </button>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="series-title" id="series-dialog">
+   <div class="dialog-heading">
+    <h2 id="series-title">
+     Numero della serie
+    </h2>
+    <button aria-label="Chiudi numero serie" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content">
+    <form id="series-form">
+     <label for="series-number">
+      Numero
+     </label>
+     <input id="series-number" inputmode="numeric" max="9999" min="1" required="" step="1" type="number"/>
+     <p class="helper">
+      Per correggere una serie già salvata, aprila dallo storico e scegli “Modifica”. L’originale resta conservato fino al nuovo salvataggio.
+     </p>
+     <button type="submit">
+      Conferma numero
+     </button>
+    </form>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="history-title" id="history-dialog">
+   <div class="dialog-heading">
+    <h2 id="history-title">
+     Storico
+    </h2>
+    <button aria-label="Chiudi storico" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content">
+    <label for="history-session">
+     Sessione
+    </label>
+    <select id="history-session">
+    </select>
+    <label for="history-athlete">
+     Atleta
+    </label>
+    <select id="history-athlete">
+    </select>
+    <ul class="record-list" id="history-list">
+    </ul>
+    <h3>
+     Bozze conservate
+    </h3>
+    <ul class="record-list" id="draft-list">
+    </ul>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="summary-title" id="summary-dialog">
+   <div class="dialog-heading">
+    <h2 id="summary-title">
+     Riepilogo locale
+    </h2>
+    <button aria-label="Chiudi riepilogo" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content">
+    <p class="helper">
+     Dati presenti su questo dispositivo, disponibili anche senza rete.
+    </p>
+    <div id="summary-list">
+    </div>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="confirm-title" id="confirm-dialog">
+   <div class="dialog-heading">
+    <h2 id="confirm-title">
+     Conferma
+    </h2>
+   </div>
+   <div class="dialog-content">
+    <p id="confirm-message">
+    </p>
+    <form class="primary-actions" method="dialog">
+     <button autofocus="" class="secondary" value="cancel">
+      Annulla
+     </button>
+     <button class="danger" id="confirm-accept" value="accept">
+      Conferma
+     </button>
+    </form>
+   </div>
+  </dialog>
+  <noscript>
+   Per registrare i colpi è necessario attivare JavaScript nel browser.
+  </noscript>
+ </body>
 </html>
