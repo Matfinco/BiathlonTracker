@@ -27,6 +27,12 @@ function identifier_(value,optional){
   if(!/^[A-Za-z0-9_.:-]{1,180}$/.test(v))throw Error('Identificativo non valido.');
   return v;
 }
+function spreadsheet_(){
+  // Web app requests have no active spreadsheet; open the configured file explicitly.
+  var id=String(PropertiesService.getScriptProperties().getProperty('BIATHLON_SPREADSHEET_ID')||'').trim();
+  if(!/^[A-Za-z0-9_-]+$/.test(id))throw Error('Configura BIATHLON_SPREADSHEET_ID nelle Proprietà script con il solo ID del foglio Google.');
+  return SpreadsheetApp.openById(id);
+}
 function lastDataRow_(sheet){
   var last=sheet.getLastRow();if(last<2)return 1;
   var ids=sheet.getRange(2,1,last-1,1).getValues();
@@ -112,8 +118,7 @@ function doPost(e){
     });
     lock=LockService.getScriptLock();
     if(!lock.tryLock(15000))throw Error('Archivio occupato. Riprova: le operazioni sono conservate sul dispositivo.');
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
-    if(!ss)throw Error('Collega lo script al foglio di lavoro.');
+    var ss=spreadsheet_();
     if(data.action==='roster'){
       var listed=roster_(ss);
       SpreadsheetApp.flush();
@@ -217,7 +222,7 @@ function doGet(e){
     });
     lock=LockService.getScriptLock();
     if(!lock.tryLock(15000))throw Error('Archivio occupato. Riprova.');
-    var result=roster_(SpreadsheetApp.getActiveSpreadsheet());
+    var result=roster_(spreadsheet_());
     SpreadsheetApp.flush();
     return json_({
       status:'success',protocolVersion:2,coach:authorized.name,roster:result.roster

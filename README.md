@@ -21,6 +21,8 @@ L’indirizzo del deployment, le firme e le chiavi **non sono inclusi nel codice
 
 Prima di pubblicare il frontend, aggiornare lo script Google seguendo [la procedura di deployment](docs/GOOGLE_APPS_SCRIPT.md). Il vecchio script non verifica le chiavi personali e non supporta il nuovo protocollo: la nuova app segnalerà la necessità di aggiornamento e conserverà le operazioni non confermate.
 
+Nel progetto Google configurare la proprietà `BIATHLON_SPREADSHEET_ID` con l’ID del foglio destinatario e creare una chiave per ogni allenatore. Queste proprietà si impostano in Apps Script, separatamente dalle impostazioni dell’app sul dispositivo.
+
 Ogni allenatore riceve una chiave personale associata alla propria firma. Lo script rifiuta chiavi assenti o revocate, firme diverse da quella autorizzata e cancellazioni di serie di altri allenatori. L’app può raccogliere bozze offline; soltanto credenziali valide consentono lettura dell’anagrafica e scrittura sul foglio.
 
 GitHub Pages può continuare a pubblicare dalla radice del ramo `main`: non è necessaria una compilazione. Dopo il push verificare il risultato dell’eventuale pubblicazione GitHub Pages e aprire la pagina con rete disponibile prima dell’uso offline.

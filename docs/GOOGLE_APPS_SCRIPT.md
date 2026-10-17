@@ -8,6 +8,10 @@ Il push GitHub aggiorna i file dell’app; non pubblica automaticamente il codic
 2. Conservare una copia del codice attuale e del foglio prima dell’aggiornamento.
 3. Sostituire il codice con il contenuto di [`backend/Code.gs`](../backend/Code.gs), quindi salvare.
 4. Verificare che esistano i tab `Database` e `Anagrafica`. Se il database ha un nome diverso, impostare nelle Proprietà script `BIATHLON_DATABASE_SHEET` con quel nome.
+5. Copiare l’ID del foglio dal suo indirizzo: in `https://docs.google.com/spreadsheets/d/ID_DEL_FOGLIO/edit`, è la parte tra `/d/` e `/edit`.
+6. In **Impostazioni progetto → Proprietà script**, aggiungere `BIATHLON_SPREADSHEET_ID` con il solo ID copiato, poi salvare le proprietà. L’account che esegue il deployment deve poter modificare quel foglio.
+
+Lo script apre esplicitamente il file configurato. Nelle richieste alla web app non è disponibile il contesto del foglio attivo, anche se il progetto è stato aperto dal foglio: [documentazione Google sui metodi degli script collegati](https://developers.google.com/apps-script/guides/bound#special_methods).
 
 Le colonne **A–O di Database conservano ordine e intestazioni esistenti**. Il nuovo codice aggiunge P `AtletaID`, Q `SessioneID`, R `Timestamp`; Anagrafica conserva A nome, B email, C note e aggiunge D `AtletaID`. Viene creato il foglio nascosto `_BiathlonDeleted`, che conserva gli identificativi eliminati e impedisce reinserimenti da richieste ritardate. Non cancellarlo durante la manutenzione ordinaria.
 

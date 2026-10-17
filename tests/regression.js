@@ -440,15 +440,18 @@
       Database:new Sheet('Database',[BIATHLON_HEADERS.slice(0,15)]),Anagrafica:new Sheet('Anagrafica',[['Nome','Email','Note'],['Atleta A','a@example.test','']])
     };
     properties={
+      BIATHLON_SPREADSHEET_ID:'test-sheet-id',
       BIATHLON_COACH_KEYS:JSON.stringify({
         'coach-token':'Coach','other-token':'Other Coach'
       })
     };
     locked=false;
     globalThis.SpreadsheetApp={
-      getActiveSpreadsheet:()=>({
-        getSheetByName:n=>sheets[n]||null,insertSheet:n=>(sheets[n]=new Sheet(n))
-      }),flush:()=>{
+      getActiveSpreadsheet:()=>{throw Error('No active spreadsheet in a deployed web app');},
+      openById:id=>{
+        equal(id,'test-sheet-id');
+        return {getSheetByName:n=>sheets[n]||null,insertSheet:n=>(sheets[n]=new Sheet(n))};
+      },flush:()=>{
       }
     };
     globalThis.LockService={
@@ -488,6 +491,24 @@
       }
     });
   }
+  await test('Deployed handlers open the configured file without an active spreadsheet',()=>{
+    server();
+    equal(post({action:'roster'}).status,'success');
+    equal(doGet({parameter:{token:'coach-token'}}).status,'success');
+    equal(post({inserts:[serverPacket()]}).status,'success');
+  });
+  await test('Missing spreadsheet configuration returns an actionable error without writes',()=>{
+    server();
+    delete properties.BIATHLON_SPREADSHEET_ID;
+    const before=D.clone(sheets.Anagrafica.grid);
+    const response=post({inserts:[serverPacket()]});
+    equal(response.status,'error');
+    assert(response.error.includes('BIATHLON_SPREADSHEET_ID'));
+    equal(doGet({parameter:{token:'coach-token'}}).status,'error');
+    equal(sheets.Database.getLastRow(),1);
+    equal(sheets.Anagrafica.grid,before);
+    assert(!sheets._BiathlonDeleted);
+  });
   await test('Server insertion is idempotent across retries',()=>{
     server();
     const p=serverPacket();
