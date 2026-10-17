@@ -132,6 +132,11 @@
   function render(){
     const m=state.meta,d=currentDraft(),r=record(),active=r||d,values=active?.shots||[],isReview=!!r;
     if(review&&!r)review=null;
+    if(editing&&!values.length){
+      editing=false;
+      selectedShot=0;
+      resetGesture();
+    }
     document.body.dataset.theme=m.theme;
     $('target-box').classList.toggle('mono',m.shotColor==='white');
     const athletes=m.roster.filter(a=>m.activeIds.includes(a.id));
@@ -171,7 +176,7 @@
     $('undo-button').disabled=locked||!d?.shots.length;
     $('save-button').disabled=locked||!d?.shots.length;
     $('save-button').textContent=d?.replacesId?'Salva correzione':'Salva serie';
-    $('clear-button').disabled=locked||!d?.shots.length;
+    $('clear-button').disabled=locked||!d||(!d.shots.length&&!d.replacesId);
     $('clear-button').textContent=d?.replacesId?'Annulla correzione':'Svuota serie';
     $('lock-button').textContent=locked?'Sblocca':'Blocca';
     $('lock-button').setAttribute('aria-pressed',String(locked));
@@ -734,7 +739,8 @@
   $('clear-button').addEventListener('click',async()=>{
     const c=context(),d=currentDraft();
     if(!d||locked)return;
-    if(!await confirmAction('Svuota bersaglio',`Cancellare i ${d.shots.length} colpi della bozza? Le serie già salvate resteranno nello storico.`,'Svuota'))return;
+    const correcting=Boolean(d.replacesId);
+    if(!await confirmAction(correcting?'Annulla correzione':'Svuota bersaglio',correcting?'Annullare le modifiche? La serie originale resterà nello storico.':`Cancellare i ${d.shots.length} colpi della bozza? Le serie già salvate resteranno nello storico.`,correcting?'Annulla correzione':'Svuota'))return;
     await change(s=>{
       const draft=D.checkedDraft(s,c.key,c.version);
       if(draft.replacesId){delete s.meta.drafts[c.key];D.draft(s);return;}
@@ -960,7 +966,7 @@
         worker?.addEventListener('statechange',check);
       });
       check();
-      const cache=await caches.open('biathlon-field-v6-4');
+      const cache=await caches.open('biathlon-field-v6-5');
       $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       if(!navigator.serviceWorker.controller)ready.active?.postMessage({
         type:'CLAIM'

@@ -24,7 +24,7 @@
       });
     }catch(error){
       testResults.push({
-        name,ok:false,error:String(error.stack||error)
+        name,ok:false,error:String(error.message||error)+' '+String(error.stack||'')
       });
     }
   }
@@ -216,6 +216,48 @@
     assert(shots.length===2);
     assert(Math.abs(shots[0].x-240/390*400)<1e-9);
     assert(Math.abs(shots[1].x-220/390*400)<1e-9);
+  });
+  async function openCorrection(){
+    await tap();await tap(220,220);
+    await element('save-button').click();await flush();
+    const original=BiathlonDomain.clone(__uiRepo.snapshot.series[0]);
+    await element('history-open').click();
+    await element('history-list').children[0].children[1].children[1].click();await flush();
+    assert(BiathlonDomain.draft(__uiRepo.snapshot).replacesId===original.id,'Original series was not opened for correction');
+    assert(element('edit-button').getAttribute('aria-pressed')==='true','Correction did not start shot editing');
+    await element('undo-button').click();await flush();
+    await element('undo-button').click();await flush();
+    assert(BiathlonDomain.draft(__uiRepo.snapshot).shots.length===0,'Undo did not remove all shots');
+    return original;
+  }
+  await test('Removing the final shot of a correction allows new shots and saving a replacement',async()=>{
+    const original=await openCorrection();
+    assert(element('edit-button').getAttribute('aria-pressed')==='false','Empty correction stayed in shot editing mode');
+    assert(!element('clear-button').disabled,'Empty correction cannot be cancelled');
+    assert(element('save-button').disabled,'An empty correction must not replace the original');
+    assert(__uiRepo.snapshot.series[0].id===original.id);
+    await tap(240,240);
+    assert(BiathlonDomain.draft(__uiRepo.snapshot).shots.length===1);
+    await element('save-button').click();await flush();
+    const replacement=__uiRepo.snapshot.series[0];
+    assert(__uiRepo.snapshot.series.length===1);
+    assert(replacement.id!==original.id&&replacement.series===original.series);
+    assert(replacement.timestamp===original.timestamp);
+    assert(replacement.shots.length===1);
+    assert(__uiRepo.snapshot.outbox.some(op=>op.kind==='delete'&&op.seriesId===original.id));
+    assert(__uiRepo.snapshot.outbox.some(op=>op.kind==='insert'&&op.seriesId===replacement.id));
+  });
+  await test('Cancelling an empty correction preserves the original series and pending operations',async()=>{
+    const original=await openCorrection();
+    const queue=JSON.stringify(__uiRepo.snapshot.outbox);
+    assert(!element('clear-button').disabled,'Cancel is disabled after undoing every shot');
+    const pending=element('clear-button').click();await flush();
+    element('confirm-dialog').close('accept');await pending;await flush();
+    assert(JSON.stringify(__uiRepo.snapshot.series[0])===JSON.stringify(original));
+    assert(JSON.stringify(__uiRepo.snapshot.outbox)===queue);
+    assert(!BiathlonDomain.draft(__uiRepo.snapshot).replacesId);
+    await tap();await element('save-button').click();await flush();
+    assert(__uiRepo.snapshot.series.length===2,'Registration did not resume after cancellation');
   });
   await test('UI athlete names are text, never interpreted markup',async()=>{
     const s=__uiRepo.snapshot;

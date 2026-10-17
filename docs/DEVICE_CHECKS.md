@@ -17,6 +17,7 @@ Da svolgere prima dell’uso in allenamento. Le prove automatiche usano API simu
 - Inserire una bozza per A, passare a B e registrare una serie. Tornando ad A la sua bozza deve essere intatta.
 - Cambiare posizione o modalità e ritrovare separatamente le bozze.
 - Aprire una serie da correggere e uscire: l’originale resta nello storico finché non si salva la correzione.
+- Durante una correzione usare Annulla colpo fino a svuotare il bersaglio: deve essere possibile inserire nuovi colpi e salvare, oppure usare Annulla correzione mantenendo originale e invii pendenti. Ripetere con una serie da un solo colpo.
 - Avviare una nuova sessione e recuperare serie e bozze della precedente dallo storico.
 - Configurare 1, 5 e 50 colpi. Abbassare il limite con una bozza più lunga: nessun colpo deve sparire.
 - Esportare un backup, ripristinarlo su un profilo di prova e verificare serie, sessioni e code. La chiave va reinserita.
