@@ -495,6 +495,70 @@
       }
     });
   }
+  function setupEditor({detected=null,pasted='https://script.google.com/macros/s/chosen-deployment/exec',cancel=false}={}){
+    const context={prompts:0,detections:0,html:''};
+    SpreadsheetApp.getActiveSpreadsheet=()=>({getId:()=>properties.BIATHLON_SPREADSHEET_ID||'test-sheet-id'});
+    SpreadsheetApp.getUi=()=>({
+      Button:{OK:'ok',CANCEL:'cancel'},ButtonSet:{OK_CANCEL:'ok_cancel'},
+      prompt:()=>{context.prompts++;return {getSelectedButton:()=>cancel?'cancel':'ok',getResponseText:()=>pasted};},
+      showModalDialog:output=>{context.html=output.html;}
+    });
+    globalThis.ScriptApp={getService:()=>({getUrl:()=>{context.detections++;return detected;}})};
+    globalThis.HtmlService={createHtmlOutput:html=>({html,setWidth(){return this;},setHeight(){return this;}})};
+    return context;
+  }
+  await test('Setup accepts production URLs with account and Workspace prefixes',()=>{
+    const expected='https://script.google.com/macros/s/deployment-ID/exec';
+    for(const url of [expected,expected+'/',expected+'?authuser=0','https://script.google.com/macros/u/0/s/deployment-ID/exec','https://script.google.com/a/macros/team.example/s/deployment-ID/exec','https://script.google.com/a/team.example/macros/s/deployment-ID/exec'])equal(normalizeServiceUrl_(url),expected);
+    for(const url of ['https://evil.example/macros/s/id/exec','https://script.google.com.evil.example/macros/s/id/exec','http://script.google.com/macros/s/id/exec','https://script.google.com/macros/s/id/dev'])equal(normalizeServiceUrl_(url),'');
+  });
+  await test('Setup asks for an existing deployment when automatic detection returns no URL',()=>{
+    server();
+    delete properties.BIATHLON_SPREADSHEET_ID;
+    const originalToken=properties.BIATHLON_ADMIN_TOKEN,editor=setupEditor();
+    configuraBiathlon();
+    equal(editor.prompts,1);
+    equal(properties.BIATHLON_SPREADSHEET_ID,'test-sheet-id');
+    equal(properties.BIATHLON_SERVICE_URL,'https://script.google.com/macros/s/chosen-deployment/exec');
+    equal(properties.BIATHLON_ADMIN_TOKEN,originalToken);
+    const link=editor.html.match(/href="([^"]+)"/)[1];
+    const config=D.invitation(link);
+    equal(config.role,'admin');
+    equal(config.cloudUrl,properties.BIATHLON_SERVICE_URL);
+    equal(config.apiToken,originalToken);
+    equal(post({token:config.apiToken,action:'admin.list'}).status,'success');
+    configuraBiathlon();
+    equal(editor.prompts,1);
+    equal(editor.detections,1);
+    equal(properties.BIATHLON_ADMIN_TOKEN,originalToken);
+  });
+  await test('Detected Workspace deployment is normalized and reused without manual properties',()=>{
+    server();
+    const editor=setupEditor({detected:'https://script.google.com/a/macros/team.example/s/active-deployment/exec'});
+    configuraBiathlon();
+    equal(editor.prompts,0);
+    equal(properties.BIATHLON_SERVICE_URL,'https://script.google.com/macros/s/active-deployment/exec');
+  });
+  await test('Cancelling setup or entering an invalid deployment leaves credentials unchanged',()=>{
+    for(const options of [{cancel:true},{pasted:'https://evil.example/exec'},{pasted:'https://script.google.com/macros/s/testing/dev'}]){
+      server();
+      const before=D.clone(properties),editor=setupEditor(options);
+      if(options.cancel)configuraBiathlon();else throws(()=>configuraBiathlon());
+      equal(properties,before);
+      equal(editor.html,'');
+    }
+  });
+  await test('Owner can explicitly choose another deployment while preserving personal accesses',()=>{
+    server();
+    properties.BIATHLON_SERVICE_URL='https://script.google.com/macros/s/previous-deployment/exec';
+    const token=properties.BIATHLON_ADMIN_TOKEN,editor=setupEditor();
+    scegliServizioBiathlon();
+    equal(editor.prompts,1);
+    equal(editor.detections,0);
+    equal(properties.BIATHLON_SERVICE_URL,'https://script.google.com/macros/s/chosen-deployment/exec');
+    equal(properties.BIATHLON_ADMIN_TOKEN,token);
+    equal(post({action:'roster'}).status,'success');
+  });
   await test('Deployed handlers open the configured file without an active spreadsheet',()=>{
     server();
     equal(post({action:'roster'}).status,'success');

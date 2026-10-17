@@ -8,8 +8,10 @@ Il push GitHub aggiorna i file dell’app; non pubblica automaticamente il codic
 2. Conservare una copia del codice attuale e del foglio prima dell’aggiornamento.
 3. Sostituire il codice con il contenuto di [`backend/Code.gs`](../backend/Code.gs), quindi salvare.
 4. Verificare che esistano i tab `Database` e `Anagrafica`. Se il database ha un nome diverso, impostare nelle Proprietà script `BIATHLON_DATABASE_SHEET` con quel nome.
-5. Copiare l’ID del foglio dal suo indirizzo: in `https://docs.google.com/spreadsheets/d/ID_DEL_FOGLIO/edit`, è la parte tra `/d/` e `/edit`.
-6. In **Impostazioni progetto → Proprietà script**, aggiungere `BIATHLON_SPREADSHEET_ID` con il solo ID copiato, poi salvare le proprietà. L’account che esegue il deployment deve poter modificare quel foglio.
+5. Aggiornare il deployment come descritto sotto, poi eseguire `configuraBiathlon` dall’editor e tornare alla scheda del foglio Google. La funzione configura automaticamente l’ID del foglio e mostra il collegamento amministratore.
+6. Se il rilevamento automatico dell’indirizzo non riesce, nel foglio compare una richiesta: incollare l’URL dell’Applicazione web preso da **Esegui deployment → Gestisci deployment** nello stesso progetto. Deve terminare con `/exec`. Per scegliere esplicitamente il deployment eseguire `scegliServizioBiathlon` oppure usare **Biathlon → Scegli indirizzo del servizio** dopo aver riaperto il foglio.
+
+L’indirizzo scelto viene conservato nella proprietà privata `BIATHLON_SERVICE_URL`; le varianti Google con account o dominio Workspace vengono convertite nell’indirizzo standard del medesimo deployment. Annullare la richiesta o inserire un indirizzo non valido lascia invariati configurazione e accessi. Ripetere la configurazione conserva la credenziale amministratore e quelle degli allenatori.
 
 Lo script apre esplicitamente il file configurato. Nelle richieste alla web app non è disponibile il contesto del foglio attivo, anche se il progetto è stato aperto dal foglio: [documentazione Google sui metodi degli script collegati](https://developers.google.com/apps-script/guides/bound#special_methods).
 
@@ -17,25 +19,23 @@ Le colonne **A–O di Database conservano ordine e intestazioni esistenti**. Il 
 
 Il codice non sostituisce le email esistenti. Per gli atleti nuovi conserva il comportamento precedente con email segnaposto; completare l’anagrafica se le regole di Looker dipendono da quella colonna. Le autorizzazioni del report Looker rimangono quelle configurate nel report.
 
-## 2. Creare una chiave personale
+## 2. Gestire gli allenatori dall’app
 
-Per ogni allenatore:
+1. Aprire sul telefono o tablet il collegamento amministratore mostrato da `configuraBiathlon` e confermare l’attivazione con connessione disponibile. Questo collegamento va conservato dall’amministratore.
+2. Nell’app aprire **Menu → Gestisci allenatori**.
+3. Inserire nome e cognome e premere **Aggiungi allenatore**. L’app mostra il collegamento personale da copiare o condividere con l’allenatore.
+4. Nell’elenco sono visibili nome, stato e chiave associata. **Rigenera accesso** invalida il collegamento precedente; **Revoca accesso** blocca i successivi invii senza cancellare le serie conservate sui dispositivi.
+5. Per registrare le proprie serie, l’amministratore crea anche un accesso allenatore per sé. I due accessi possono coesistere sul dispositivo.
 
-1. Aprire **Impostazioni progetto → Proprietà script**.
-2. Aggiungere `NUOVO_ALLENATORE` con la firma esatta, per esempio `Matteo Finco`.
-3. Tornare all’editor, scegliere la funzione `creaChiaveAllenatore` ed eseguirla. Autorizzare lo script nel proprio account, se richiesto.
-4. Nel registro di esecuzione copiare la chiave generata e consegnarla privatamente all’allenatore, insieme alla firma esatta e all’indirizzo di sincronizzazione.
-5. Ripetere per gli altri allenatori. La funzione conserva le chiavi precedenti.
+Le credenziali sono conservate nelle proprietà private del progetto Google. La vecchia proprietà `BIATHLON_COACH_KEYS`, se presente, viene migrata mantenendo le chiavi valide e l’associazione al nome. La creazione e la gestione degli allenatori non richiedono modifiche manuali alle proprietà né al codice.
 
-Le chiavi sono conservate nella proprietà privata `BIATHLON_COACH_KEYS`, come oggetto JSON che associa ciascuna chiave alla firma autorizzata. Non commettere questa proprietà nel repository. Il servizio rifiuta tutte le richieste finché non esiste almeno una chiave configurata.
-
-Per revocare una chiave, rimuovere la sua voce da `BIATHLON_COACH_KEYS`, mantenendo valido il JSON. Non serve cambiare l’indirizzo dell’app. La revoca blocca gli invii successivi; le bozze già presenti sui dispositivi restano locali.
+La gestione riguarda un unico archivio e un’anagrafica comune. Non è presente la separazione per gruppi o società.
 
 ## 3. Aggiornare il deployment esistente
 
 1. Aprire **Esegui deployment → Gestisci deployment**.
 2. Modificare il deployment della web app esistente.
-3. Selezionare una nuova versione e descriverla, per esempio `Protocollo 2: chiavi allenatori, identificativi stabili, invii idempotenti`.
+3. Selezionare una nuova versione e descriverla, per esempio `Gestione allenatori nell’app e configurazione del deployment esistente`.
 4. Per il funzionamento dalla pagina GitHub senza login Google incorporato, la web app deve eseguire come proprietario ed essere raggiungibile dal browser degli allenatori. Con l’accesso `Chiunque`, l’autorizzazione ai dati è applicata dal codice tramite le chiavi personali; nessuna richiesta anonima viene accettata dal nuovo script.
 5. Pubblicare mantenendo il deployment esistente, così l’indirizzo `/exec` resta lo stesso.
 
@@ -43,16 +43,13 @@ Riferimento ufficiale: [Web app Apps Script](https://developers.google.com/apps-
 
 ## 4. Configurare ciascun dispositivo
 
-Nell’app aprire **Menu → Impostazioni** e inserire manualmente:
+L’allenatore apre il proprio collegamento e conferma **Attiva su questo dispositivo** con connessione disponibile. Nome, credenziale, destinazione e anagrafica vengono configurati insieme. In alternativa può incollare il collegamento in **Menu → Impostazioni e atleti → Collegamento personale ricevuto**. La configurazione manuale resta disponibile per assistenza.
 
-- firma esatta associata alla chiave;
-- indirizzo HTTPS del deployment che termina in `/exec`;
-- chiave personale dell’allenatore;
-- eventuale indirizzo del report Looker.
+I presenti sono scelti in **Nuova sessione**; scaricare l’anagrafica non seleziona automaticamente tutti gli atleti. Il report Looker e le preferenze di visualizzazione si impostano nelle impostazioni.
 
-Salvare, scaricare l’anagrafica e avviare una sessione. I presenti sono scelti dall’allenatore; il download dell’anagrafica non seleziona automaticamente tutti gli atleti.
+I collegamenti personali contengono la credenziale dopo `#`; all’apertura l’app rimuove il frammento dall’indirizzo e richiede conferma prima di salvare l’accesso. Le richieste al servizio Google inviano la credenziale nel corpo HTTPS. Il codice pubblico non contiene credenziali precompilate. Le serie salvate prima di configurare la firma vengono associate alla firma al momento dell’invio; quelle già firmate mantengono la propria attribuzione.
 
-Le chiavi sono inviate nel corpo della richiesta HTTPS, non come parametro del link configurato. Il frontend non contiene credenziali precompilate. Le serie salvate prima di configurare la firma vengono associate alla firma al momento dell’invio; quelle già firmate mantengono la propria attribuzione.
+Per un nuovo atleta si può usare **Archivio atleti → Aggiungi**, anche offline. L’inserimento è inizialmente locale: l’anagrafica Google viene aggiornata alla prima serie sincronizzata per quell’atleta. Gli altri dispositivi lo trovano scaricando di nuovo l’anagrafica.
 
 ## 5. Verifica di integrazione
 

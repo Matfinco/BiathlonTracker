@@ -296,21 +296,45 @@ function doGet(e){
   }
 }
 function onOpen(){
-  SpreadsheetApp.getUi().createMenu('Biathlon').addItem('Apri gestione allenatori','configuraBiathlon').addToUi();
+  SpreadsheetApp.getUi().createMenu('Biathlon').addItem('Apri gestione allenatori','configuraBiathlon').addItem('Scegli indirizzo del servizio','scegliServizioBiathlon').addToUi();
+}
+function normalizeServiceUrl_(value){
+  var url=String(value||'').trim();
+  // Google can include the signed-in account or Workspace domain in its URL.
+  var match=/^https:\/\/script\.google\.com\/(?:macros\/(?:u\/\d+\/)?s|a\/(?:macros\/[^/?#]+|[^/?#]+\/macros)\/s)\/([A-Za-z0-9_-]+)\/exec\/?(?:\?[^#\s]*)?(?:#[^\s]*)?$/.exec(url);
+  return match?'https://script.google.com/macros/s/'+match[1]+'/exec':'';
+}
+function deploymentUrl_(choose){
+  var props=PropertiesService.getScriptProperties(),url=normalizeServiceUrl_(props.getProperty('BIATHLON_SERVICE_URL'));
+  if(!choose&&url)return url;
+  if(!choose){
+    try{url=normalizeServiceUrl_(ScriptApp.getService().getUrl());}catch(error){url='';}
+    if(url)return url;
+  }
+  var ui=SpreadsheetApp.getUi();
+  var result=ui.prompt('Collega la web app Google','Incolla l’indirizzo dell’Applicazione web che trovi in Esegui deployment → Gestisci deployment, nello stesso progetto. Deve terminare con /exec. Questa finestra compare nel foglio Google.',ui.ButtonSet.OK_CANCEL);
+  if(result.getSelectedButton()!==ui.Button.OK)return '';
+  url=normalizeServiceUrl_(result.getResponseText());
+  if(!url)throw Error('Indirizzo non riconosciuto. Riesegui la configurazione e incolla l’URL HTTPS dell’Applicazione web Google che termina con /exec.');
+  return url;
+}
+function scegliServizioBiathlon(){
+  configuraBiathlon(true);
 }
 /** Run once from the bound editor, after publishing the web app. Never called by HTTP handlers. */
-function configuraBiathlon(){
+function configuraBiathlon(choose){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   if(!ss)throw Error('Apri questo progetto dal foglio Google: Estensioni → Apps Script.');
   var props=PropertiesService.getScriptProperties(),id=props.getProperty('BIATHLON_SPREADSHEET_ID');
   if(id&&id!==ss.getId())throw Error('Il progetto è già configurato per un altro foglio. Verifica BIATHLON_SPREADSHEET_ID.');
-  var serviceUrl=ScriptApp.getService().getUrl();
-  if(!serviceUrl||!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(serviceUrl))throw Error('Pubblica prima il progetto come web app, poi esegui nuovamente configuraBiathlon.');
+  var serviceUrl=deploymentUrl_(choose===true);
+  if(!serviceUrl)return;
   var lock=LockService.getScriptLock();
   if(!lock.tryLock(15000))throw Error('Archivio occupato. Riprova.');
   var token;
   try{
     props.setProperty('BIATHLON_SPREADSHEET_ID',ss.getId());
+    props.setProperty('BIATHLON_SERVICE_URL',serviceUrl);
     token=props.getProperty('BIATHLON_ADMIN_TOKEN');
     if(!token){token=Utilities.getUuid()+Utilities.getUuid();props.setProperty('BIATHLON_ADMIN_TOKEN',token);}
     migrateCoachKeys_();

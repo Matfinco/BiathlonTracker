@@ -16,7 +16,7 @@
   }
   const listeners={
   },contents=new Map(),deleted=[],added=[];
-  let claims=0,activations=0;
+  let claims=0,activations=0,currentCache='';
   globalThis.self={
     location:{
       origin:'https://example.test'
@@ -33,14 +33,16 @@
     }
   };
   globalThis.caches={
-    open:async name=>({
+    open:async name=>{
+      if(!currentCache)currentCache=name;
+      return {
       addAll:async assets=>{
         added.push(...assets);
         contents.set('https://example.test/BiathlonTracker/index.html',{
           body:'cached app'
         });
       },match:async request=>contents.get(typeof request==='string'?request:request.url)
-    }),keys:async()=>['unrelated-app','biathlon-field-v6-1','biathlon-field-v6-2'],delete:async name=>{
+    };},keys:async()=>['unrelated-app','biathlon-field-old-one','biathlon-field-old-two',currentCache],delete:async name=>{
       deleted.push(name);
     }
   };
@@ -83,7 +85,8 @@
       waitUntil:p=>task=p
     });
     await task;
-    assert(deleted.length===1&&deleted[0]==='biathlon-field-v6-1');
+    assert(deleted.length===2&&deleted.includes('biathlon-field-old-one')&&deleted.includes('biathlon-field-old-two'));
+    assert(!deleted.includes(currentCache)&&!deleted.includes('unrelated-app'));
     assert(claims===1);
   });
   await test('Worker activation requires an explicit update message',()=>{
