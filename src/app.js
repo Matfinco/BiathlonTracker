@@ -751,7 +751,11 @@
   $('athlete-select').addEventListener('change',e=>{
     const value=e.target.value;
     editing=false;
-    change(s=>D.setContext(s,value,s.meta.currentMode,s.meta.currentPos),'Atleta selezionato. Le altre bozze sono conservate.');
+    change(s=>{
+      // A resumed archived draft stays in the history; the new athlete uses the current session
+      D.returnToLiveSession(s);
+      D.setContext(s,value,s.meta.currentMode,s.meta.currentPos);
+    },'Atleta selezionato. Le altre bozze sono conservate.');
   });
   async function changeCurrentSeriesContext(mode,position){
     const c=context(),source=currentDraft();
@@ -854,10 +858,13 @@
     if(!await confirmAction(correcting?'Annulla correzione':'Svuota bersaglio',correcting?'Annullare le modifiche? La serie originale resterà nello storico.':`Cancellare i ${d.shots.length} colpi della bozza? Le serie già salvate resteranno nello storico.`,correcting?'Annulla correzione':'Svuota'))return;
     await change(s=>{
       const draft=D.checkedDraft(s,c.key,c.version);
-      if(draft.replacesId){delete s.meta.drafts[c.key];D.draft(s);return;}
-      draft.shots=[];
-      draft.version++;
-      draft.replacesId=null;
+      if(draft.replacesId)delete s.meta.drafts[c.key];
+      else{
+        draft.shots=[];
+        draft.version++;
+      }
+      D.returnToLiveSession(s);
+      D.draft(s);
     });
     editing=false;
     render();
@@ -1069,7 +1076,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-11');
+        const cache=await caches.open('biathlon-field-v6-12');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();

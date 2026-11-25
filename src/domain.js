@@ -162,7 +162,8 @@
       // can be cancelled while preserving its archived original.
       if(destination.shots.length){
         setContext(state,m.currentAthleteId,mode,position);
-        saveSeries(state,destination.key,destination.version);
+        // Stay in the source session: the moved draft still belongs to it
+        saveSeries(state,destination.key,destination.version,true);
       }else delete m.drafts[destinationKey];
     }
     const original=current.replacesId?state.series.find(r=>r.id===current.replacesId):null;
@@ -191,7 +192,22 @@
   function localDate(date) {
     return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   }
-  function saveSeries(state, expectedKey, expectedVersion) {
+  // The most recently started session receives new series
+  function liveSessionId(state) {
+    let live=null;
+    for(const s of state.sessions)if(!live||String(s.startedAt)>=String(live.startedAt))live=s;
+    return live?.id||state.meta.sessionId;
+  }
+  // Leave an archived session opened for a correction or a resumed draft
+  function returnToLiveSession(state) {
+    const m=state.meta,live=liveSessionId(state);
+    if(m.sessionId===live)return false;
+    const d=m.drafts[key(m)];
+    if(d&&!d.shots.length&&!d.replacesId)delete m.drafts[d.key];
+    m.sessionId=live;
+    return true;
+  }
+  function saveSeries(state, expectedKey, expectedVersion, keepSession = false) {
     const d = checkedDraft(state, expectedKey, expectedVersion);
     if (!d.shots.length) throw Error('Inserisci almeno un colpo.');
     const a = state.meta.roster.find(a=>a.id===d.athleteId);
@@ -210,6 +226,7 @@
     state.meta.counters[ck] = Math.max(state.meta.counters[ck]||1,d.number+1);
     delete state.meta.drafts[d.key];
     state.meta.lastActivity=Date.now();
+    if(!keepSession)returnToLiveSession(state);
     draft(state);
     return record;
   }
@@ -374,6 +391,6 @@
     return s;
   }
   root.BiathlonDomain={
-    MODES,VERSION,clone,uid,id,validUrl,syncUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,changeSeriesContext,packet,enqueue,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
+    MODES,VERSION,clone,uid,id,validUrl,syncUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,changeSeriesContext,packet,enqueue,liveSessionId,returnToLiveSession,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
   };
 })(globalThis);

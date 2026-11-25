@@ -994,6 +994,37 @@
   });
   await test('Server appends by actual IDs rather than distant formulas',()=>{server();sheets.Database.grid[20]=['','','formula'];const p=serverPacket();equal(post({inserts:[p]}).status,'success');equal(sheets.Database.grid[1][0],p.id);equal(sheets.Database.grid[20][2],'formula');});
   await test('Server expands the sheet before writing beyond its row limit',()=>{server();sheets.Database.maxRows=1;const p=serverPacket();equal(post({inserts:[p]}).status,'success');assert(sheets.Database.getMaxRows()>=2);});
+  await test('Saving a correction of an archived series returns new series to the current session',()=>{
+    const s=setup();add(s);const old=save(s),oldSession=s.meta.sessionId;
+    D.startSession(s,['1']);const today=s.meta.sessionId;
+    D.editSeries(s,old.id);equal(s.meta.sessionId,oldSession);
+    const corrected=save(s);equal(corrected.sessionId,oldSession);equal(s.meta.sessionId,today);
+    add(s);const next=save(s);equal(next.sessionId,today);equal(next.series,'1T');
+  });
+  await test('Cancelling a correction of an archived series returns to the current session',()=>{
+    const s=setup();add(s);const old=save(s);
+    D.startSession(s,['1']);const today=s.meta.sessionId;
+    D.editSeries(s,old.id);const k=D.draft(s).key;
+    delete s.meta.drafts[k];D.returnToLiveSession(s);D.draft(s);
+    equal(s.meta.sessionId,today);equal(D.draft(s).sessionId,today);
+    assert(s.series.some(r=>r.id===old.id));
+  });
+  await test('Saving a resumed draft of an old session returns to the current session',()=>{
+    const s=setup();add(s);const oldSession=s.meta.sessionId,oldKey=D.draft(s).key;
+    D.startSession(s,['2']);const today=s.meta.sessionId;
+    s.meta.activeIds.push('1');s.meta.sessionId=oldSession;D.setContext(s,'1',s.meta.drafts[oldKey].mode,s.meta.drafts[oldKey].position);
+    const resumed=save(s);equal(resumed.sessionId,oldSession);equal(s.meta.sessionId,today);
+    assert(!Object.values(s.meta.drafts).some(d=>d.sessionId===oldSession&&!d.shots.length));
+  });
+  await test('Moving a correction onto an occupied draft keeps both in the archived session',()=>{
+    const s=setup();add(s);const old=save(s),oldSession=s.meta.sessionId;
+    D.startSession(s,['1']);
+    D.editSeries(s,old.id);
+    s.meta.drafts[D.key({...s.meta,currentMode:'Gara'})]={key:D.key({...s.meta,currentMode:'Gara'}),sessionId:oldSession,athleteId:'1',athleteName:'Atleta A',mode:'Gara',position:'T',number:1,wind:{dir:'C',int:0},shots:[D.shot(200,220,'T',1)],version:3,replacesId:null};
+    const moved=moveSeries(s,'Gara','T',3);
+    equal(moved.sessionId,oldSession);equal(s.meta.sessionId,oldSession);
+    assert(s.series.some(r=>r.sessionId===oldSession&&r.type==='Gara'));
+  });
   globalThis.testDone=true;
 })().catch(error=>{
   testResults.push({
