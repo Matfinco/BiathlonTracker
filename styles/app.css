@@ -167,16 +167,6 @@ form>button{
 }.context-row button,.context-row select{
   font-size:.94rem;
   padding:10px 6px
-}.target-context{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:8px;
-  font-size:.85rem;
-  color:var(--muted)
-}.target-context .text-button{
-  min-height:44px;
-  padding:6px 4px
 }.target-section{
   width:100%;
   margin:0;
@@ -311,19 +301,6 @@ form>button{
   touch-action:pan-y
 } .field-controls{
   padding:8px max(12px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))
-}.shot-summary{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:6px;
-  flex-wrap:wrap
-}.shot-summary>strong{
-  font-size:1.05rem
-}.shot-summary>span{
-  font-size:.9rem
-}.shot-summary .text-button{
-  font-size:.88rem;
-  padding:8px
 }.shot-picker{
   display:flex;
   gap:8px;
@@ -346,16 +323,6 @@ form>button{
   flex:1.3;
   font-size:1.08rem;
   min-height:64px
-}.secondary-actions{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  margin-top:8px
-}.secondary-actions button{
-  flex:1;
-  min-width:0;
-  font-size:.86rem;
-  padding:8px
 }.storage-status{
   font-weight:700;
   color:var(--success);
@@ -363,16 +330,6 @@ form>button{
   font-size:.89rem
 }.storage-status.error{
   color:var(--danger)
-}.sync-status{
-  display:block;
-  text-align:left;
-  background:transparent;
-  color:var(--muted);
-  padding:8px 0;
-  font-size:.85rem;
-  min-height:44px;
-  text-decoration:underline;
-  text-underline-offset:3px
 }.notice{
   padding:12px;
   border:2px solid var(--accent);
@@ -581,8 +538,6 @@ dialog::backdrop{
 @media(min-width:700px){
   :root{
     font-size:20px
-  }.context-row{
-    grid-template-columns:1fr 1fr 2fr
   }.field-header,.field-controls{
     padding-left:max(20px,env(safe-area-inset-left));
     padding-right:max(20px,env(safe-area-inset-right))
@@ -592,10 +547,6 @@ dialog::backdrop{
     font-size:17px
   }.primary-actions button{
     min-height:64px
-  }.secondary-actions button{
-    font-size:1rem
-  }.shot-summary>strong{
-    font-size:1.2rem
   }
 }
 @media(prefers-reduced-motion:no-preference){
@@ -628,15 +579,73 @@ dialog::backdrop{
   width:100%;
   height:100%
 }
-/* Saving and undo stay reachable while a full-width target is scrolled. */
-.field-controls{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
-#entry-actions,#review-actions{position:fixed;bottom:0;left:0;right:0;z-index:20;margin:0;padding:10px max(12px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:var(--bg);border-top:2px solid var(--line)}
-.text-button.danger-text{color:var(--danger)}
-.target-context .text-button{min-height:56px}
 .menu-group{margin:14px 0 -2px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .menu-group:first-of-type{margin-top:0}
 .menu-account{margin:0;font-weight:700}
 .menu-grid>.helper{margin:-4px 0 0}
-/* Edit shots: outlined button, filled while editing */
-.shot-summary .edit-button{min-height:44px;padding:8px 14px;background:var(--surface);color:var(--accent);border-color:var(--accent);font-size:.95rem}
-.shot-summary .edit-button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+/* Main screen: compact header, fitted target, fixed command dock */
+html{touch-action:pan-x pan-y}
+html.modal-open{overflow:hidden}
+body.modal-open{position:fixed;left:0;right:0;overflow:hidden}
+.field-header{padding-bottom:8px}
+.menu-anchor{position:relative;flex:none}
+.sync-status{position:absolute;top:-5px;right:-5px;width:18px;height:18px;min-height:0;padding:0;border-radius:50%;border:3px solid var(--bg);background:var(--line);font-size:0;color:transparent;overflow:hidden;pointer-events:none}
+.sync-status[data-tone=ok]{background:#1f9d55}
+.sync-status[data-tone=pending]{background:var(--focus)}
+.sync-status[data-tone=error]{background:var(--danger)}
+.context-row{grid-template-columns:56px minmax(0,.9fr) minmax(0,1.6fr) 64px;gap:6px}
+.context-row #position-button{font-size:1.25rem;padding:6px 0}
+.context-row #series-button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.context-row select{font-weight:700}
+.wind-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:2px;font-size:.72rem;line-height:1.1;white-space:nowrap}
+#wind-open .wind-flag{width:30px;height:28px}
+/* Fit the screen height, but never below 88% of the width: small phones scroll a little */
+.target-box{width:min(100%,max(88vw,calc((100vh - var(--head-h,136px) - var(--dock-h,150px) - 4px) * 10 / 11)));margin:0 auto}
+@supports(height:100dvh){.target-box{width:min(100%,max(88vw,calc((100dvh - var(--head-h,136px) - var(--dock-h,150px) - 4px) * 10 / 11)))}}
+@media(orientation:landscape) and (max-height:540px){.target-box{width:100%}}
+.target-badge{position:absolute;top:6px;z-index:3;pointer-events:none;padding:3px 9px;border-radius:8px;background:var(--surface);border:2px solid var(--line);font-weight:800;font-size:.9rem;line-height:1.25;color:var(--text)}
+.count-badge{left:6px}
+.miss-badge{right:6px}
+.field-controls{padding:8px max(12px,env(safe-area-inset-right)) calc(var(--dock-h,150px) + 8px) max(12px,env(safe-area-inset-left))}
+.dock .review-info{margin:0;padding:8px 10px;font-size:.9rem}
+.dock #review-slider-label{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.dock #review-slider{min-height:44px}
+.storage-status:not(.error){position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+/* Notices float just below the header, over the target's top margin */
+.storage-status.error,#notice{position:fixed;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));top:calc(var(--head-h,136px) + 2px);z-index:25;margin:0;padding:8px 12px;font-size:.92rem;border-radius:10px;border:2px solid var(--danger);background:var(--surface);box-shadow:0 4px 16px #0004}
+#notice{border-color:var(--accent);cursor:pointer}
+#notice.error{border-color:var(--danger)}
+.storage-status.error+#notice:not([hidden]){top:calc(var(--head-h,136px) + 58px)}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;gap:8px;padding:8px max(12px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:var(--bg);border-top:2px solid var(--line)}
+.dock .primary-actions{margin:0}
+.dock .edit-help{margin:0;line-height:1.3}
+.dock .shot-picker{padding:2px 2px 4px;margin:0}
+.dock .shot-picker button{min-height:56px;min-width:60px;font-size:1.1rem}
+.tool-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:58px;padding:4px 2px;font-size:.78rem;line-height:1.05;text-align:center}
+.tool::before{content:'';width:22px;height:22px;flex:none;background:currentColor;-webkit-mask:var(--icon) center/contain no-repeat;mask:var(--icon) center/contain no-repeat}
+.tool-edit{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16z'/%3E%3Cpath d='M13 7l4 4'/%3E%3C/svg%3E")}
+.tool-history{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h10'/%3E%3C/svg%3E")}
+.tool-lock{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4'%3E%3Crect x='5' y='11' width='14' height='9' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E")}
+.tool-lock[aria-pressed=true]{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4'%3E%3Crect x='5' y='11' width='14' height='9' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 7.5-2'/%3E%3C/svg%3E");background:var(--focus);border-color:var(--focus);color:#111}
+.tool-clear{color:var(--danger);--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linejoin='round'%3E%3Cpath d='M4 7h16M10 7V4h4v3M6.5 7l1 13h9l1-13'/%3E%3C/svg%3E")}
+/* Editing: shot numbers and one large finish button */
+.dock.editing #history-open,.dock.editing #lock-button,.dock.editing #clear-button,.dock.editing #entry-actions{display:none}
+.dock.editing .tool-row{grid-template-columns:1fr}
+.dock.editing #edit-button{flex-direction:row;gap:8px;min-height:64px;font-size:1.08rem;background:var(--accent);border-color:var(--accent);color:var(--on-accent);--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L19 7'/%3E%3C/svg%3E")}
+@media(min-width:700px){
+  .tool{font-size:.85rem;min-height:66px}
+  .target-badge{font-size:1rem;top:10px}
+  .count-badge{left:10px}.miss-badge{right:10px}
+}
+/* Tablet landscape: target on the left, header and commands on the right */
+@media(orientation:landscape) and (min-width:900px) and (min-height:600px){
+  #app{display:grid;grid-template-columns:auto minmax(320px,1fr);grid-template-rows:auto 1fr;min-height:100vh;min-height:100dvh}
+  .target-section{grid-column:1;grid-row:1 / span 2;align-self:center}
+  .target-box{width:calc((100vh - 16px) * 10 / 11);max-width:62vw}
+  @supports(height:100dvh){.target-box{width:calc((100dvh - 16px) * 10 / 11)}}
+  .field-header{grid-column:2;grid-row:1}
+  .field-controls{grid-column:2;grid-row:2;display:flex;flex-direction:column;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  .dock{position:static;margin-top:auto;padding:12px 0 0;border-top:0;background:transparent}
+  .storage-status.error,#notice{position:static;margin:8px 0;box-shadow:none}
+}

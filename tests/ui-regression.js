@@ -56,7 +56,7 @@
   await test('UI starts with 5-shot limit and explicit athlete/context',async()=>{
     assert(element('shot-count').textContent==='0 / 5 colpi');
     assert(element('athlete-select').value==='1');
-    assert(element('position-button').textContent==='Terra');
+    assert(element('position-button').textContent==='T');
   });
   await test('Updated training menu keeps an old series editable and saves new selections with their names',async()=>{
     const s=__uiRepo.snapshot,D=BiathlonDomain;
@@ -287,7 +287,7 @@
     assert(!__uiRepo.snapshot.meta.drafts[originalKey]);
     assert(element('hit-count').textContent==='1 errore');
     await element('position-button').click();await flush();
-    assert(element('position-button').textContent==='Piedi');
+    assert(element('position-button').textContent==='P');
     assert(element('hit-count').textContent==='0 errori');
     element('mode-select').value='Azzeramento';await element('mode-select').emit('change');await flush();
     await element('position-button').click();await flush();
@@ -386,7 +386,7 @@
     await target.emit('pointerup',{pointerId:1,clientX:240,clientY:240});
     await editTouch('pointerdown');await editTouch('pointerup');
     assert(element('edit-button').getAttribute('aria-pressed')==='false','A second touch would be needed');
-    assert(element('edit-button').textContent==='Modifica colpi');
+    assert(element('edit-button').textContent==='Modifica');
     assert(element('shot-picker').hidden&&element('aim-preview').hidden);
     assert(!target.hasPointerCapture(1));
     await element('edit-button').emit('click',{detail:1,pointerType:'touch',pointerId:2});
@@ -516,6 +516,19 @@
     await element('wind-save').click();await flush();
     assert(BiathlonDomain.draft(__uiRepo.snapshot).wind.int===3);
     assert(element('wind-open').querySelector('rect').getAttribute('transform')==='rotate(45 24 17)');
+  });
+  await test('UI keeps the page still behind dialogs and swaps the dock while editing',async()=>{
+    await element('menu-open').click();
+    assert(document.body.classList.contains('modal-open'),'Page can scroll behind the menu');
+    element('menu-dialog').close();
+    await element('menu-dialog').emit('close');
+    assert(!document.body.classList.contains('modal-open'),'Scroll lock stayed after closing');
+    await tap();
+    await element('edit-button').click();
+    assert(element('dock').classList.contains('editing'));
+    assert(element('edit-button').textContent==='Fine modifica');
+    await element('edit-button').click();
+    assert(!element('dock').classList.contains('editing'));
   });
   globalThis.testDone=true;
 })().catch(error=>{

@@ -10,7 +10,7 @@ App per smartphone e tablet per registrare i colpi al poligono, conservare le se
 - Se nella destinazione esiste già una vecchia serie incompleta, l’app propone di salvarla prima dello spostamento. Annullare lascia entrambe le serie come sono. Le correzioni dello storico sostituiscono l’originale soltanto quando vengono salvate, anche dopo un cambio di allenamento o posizione.
 - Tipi di allenamento: Azzeramento, Tiro da fermo, i1-i2, i3, i4, i5, Gara, Altro. Le serie e le bozze precedenti mantengono la categoria originale e restano modificabili; le nuove scelte usano le categorie aggiornate.
 - Cinque colpi iniziali; limite modificabile da **1 a 50** in **Menu → Impostazioni**. Abbassarlo non elimina colpi già presenti.
-- Tocco per inserire, anche nello stesso punto di un colpo precedente. “Modifica colpi” permette di scegliere il numero e spostare il colpo, con vista ingrandita; “Annulla colpo” rimuove l’ultimo.
+- Tocco per inserire, anche nello stesso punto di un colpo precedente. “Modifica” permette di scegliere il numero e spostare il colpo, con vista ingrandita; “Annulla colpo” rimuove l’ultimo.
 - Salva e Annulla restano raggiungibili nella barra inferiore. Interfaccia chiara da esterno, marcatori colorati con forme diverse o bianco/nero, comandi di almeno 56 pixel per le operazioni principali.
 - Storico di tutte le sessioni, bozze da riprendere, riepilogo locale, backup JSON e ripristino. Aprire una correzione conserva la serie originale fino al nuovo salvataggio.
 - Blocco dei comandi per trasporto/pulizia e mantenimento opzionale dello schermo acceso, dove il browser lo consente.
