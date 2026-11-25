@@ -166,7 +166,7 @@ function buildFixture(tree){
 }
 globalThis.__documentTree=buildFixture(__htmlTree);
 globalThis.document={
-  body:__documentTree.querySelector('body'),visibilityState:'visible',createElement:tag=>new FixtureElement(tag),createElementNS:(_,tag)=>new FixtureElement(tag),getElementById:id=>[__documentTree,...__documentTree.querySelectorAll('*')].find(e=>e.id===id),querySelectorAll:selector=>__documentTree.querySelectorAll(selector),listeners:{
+  body:__documentTree.querySelector('body'),visibilityState:'visible',createElement:tag=>new FixtureElement(tag),createElementNS:(_,tag)=>new FixtureElement(tag),getElementById:id=>[__documentTree,...__documentTree.querySelectorAll('*')].find(e=>e.id===id),querySelectorAll:selector=>__documentTree.querySelectorAll(selector),querySelector:selector=>__documentTree.querySelector(selector),listeners:{
   },addEventListener(type,fn){
     (this.listeners[type]??=[]).push(fn);
   }

@@ -259,6 +259,15 @@
       },shots:clone(record.shots),version:0,replacesId:record.id
     };
   }
+  // After this pause the app asks whether a new training has started
+  const IDLE_LIMIT=4*60*60*1000;
+  function sessionIdle(state, now = Date.now()) {
+    const m=state.meta,last=Number(m.lastActivity);
+    return m.roster.length>0&&m.activeIds.length>0&&last>0&&now-last>IDLE_LIMIT;
+  }
+  function touchSession(state) {
+    state.meta.lastActivity=Date.now();
+  }
   function startSession(state, ids) {
     const valid=ids.map(id);
     if (!valid.length) throw Error('Seleziona almeno un atleta.');
@@ -391,6 +400,6 @@
     return s;
   }
   root.BiathlonDomain={
-    MODES,VERSION,clone,uid,id,validUrl,syncUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,changeSeriesContext,packet,enqueue,liveSessionId,returnToLiveSession,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
+    MODES,VERSION,clone,uid,id,validUrl,syncUrl,invitation,invitationLink,limit,wind,shot,shots,key,counterKey,create,roster,draft,checkedDraft,addShot,setContext,changeSeriesContext,packet,enqueue,liveSessionId,returnToLiveSession,IDLE_LIMIT,sessionIdle,touchSession,saveSeries,removeSeries,editSeries,startSession,mergeRoster,migrate,validate
   };
 })(globalThis);

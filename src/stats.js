@@ -98,11 +98,16 @@
     if(m?.adminUrl&&m?.adminToken)list.push({cloudUrl:m.adminUrl,apiToken:m.adminToken,coachName:''});
     return list;
   }
-  const OUTDATED='Il codice Google pubblicato è una versione precedente. In Apps Script apri Esegui deployment → Gestisci deployment → Modifica (matita) → Versione: Nuova versione → Esegui deployment.';
+  // Names the deployment the app talks to, so it can be compared with the one edited in Apps Script
+  function outdated(config){
+    const id=/\/s\/([^/]+)\/exec/.exec(config?.cloudUrl||'')?.[1]||'';
+    return `Il servizio Google usato dall’app risponde con codice vecchio${id?` (deployment …${id.slice(-8)})`:''}. In Apps Script apri Esegui deployment → Gestisci deployment: l’ID deve finire con le stesse lettere. Se è un altro, modifica con la matita quello giusto e scegli Nuova versione, invece di creare un nuovo deployment.`;
+  }
   // Try each verified access of this device: a rotated coach key falls back to the recovery key
   async function requestArchive(list,payload){
-    let last;
+    let last,used;
     for(const config of list){
+      used=config;
       try{
         return await sync.request(config,payload);
       }catch(error){
@@ -110,7 +115,7 @@
         if(!error.server)throw error;
       }
     }
-    if(last.server&&last.serverVersion<3)throw Error(OUTDATED);
+    if(last.server&&last.serverVersion<3)throw Error(outdated(used));
     throw last;
   }
   async function download(){
@@ -130,7 +135,7 @@
       for(let page=0;page<200;page++){
         status(`Scaricamento archivio… ${archive.size} serie`);
         const r=await requestArchive(config,{action:'archive',cursor:cursor.cursor,cursorId:cursor.cursorId,tombCursor:cursor.tombCursor,inserts:[],deletes:[]});
-        if(!Array.isArray(r.rows)||!Number.isInteger(r.cursor))throw Error(OUTDATED);
+        if(!Array.isArray(r.rows)||!Number.isInteger(r.cursor))throw Error(outdated(config[0]));
         const diff=S.applyArchivePage(archive,r);
         // Each page is saved with its cursor: an interrupted download resumes from there
         cursor={cursor:r.cursor,cursorId:r.cursorId,tombCursor:r.tombCursor,updatedAt:r.done?new Date().toISOString():cursor.updatedAt};

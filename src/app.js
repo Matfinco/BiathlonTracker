@@ -290,13 +290,15 @@
     }
     $(id).showModal();
   }
-  async function confirmAction(title,message,label='Conferma'){
+  async function confirmAction(title,message,label='Conferma',{cancel='Annulla',tone='danger'}={}){
     if(confirming)return false;
     confirming=true;
     const dialog=$('confirm-dialog');
     $('confirm-title').textContent=title;
     $('confirm-message').textContent=message;
     $('confirm-accept').textContent=label;
+    $('confirm-accept').className=tone;
+    $('confirm-cancel').textContent=cancel;
     dialog.returnValue='cancel';
     dialog.showModal();
     return new Promise(resolve=>dialog.addEventListener('close',()=>{
@@ -305,6 +307,19 @@
     },{
       once:true
     }));
+  }
+  // Back after a long pause: continue the same session or start a new training
+  let idleAsking=false;
+  async function checkIdleSession(){
+    if(idleAsking||!state||!D.sessionIdle(state)||document.querySelector('dialog[open]'))return;
+    idleAsking=true;
+    try{
+      const session=state.sessions.find(s=>s.id===state.meta.sessionId);
+      const when=new Date(Number(state.meta.lastActivity)).toLocaleString('it-IT',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+      const fresh=await confirmAction('Nuovo allenamento?',`L’ultima attività risale a ${when}${session?.title?` (sessione del ${session.title})`:''}. Vuoi continuare quella sessione o iniziarne una nuova?`,'Nuova sessione',{cancel:'Continua sessione',tone:'primary'});
+      if(fresh)openDialog('session-dialog');
+      else await change(s=>D.touchSession(s));
+    }finally{idleAsking=false;}
   }
   function fillSettings(){
     const m=state.meta;
@@ -1095,7 +1110,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-15');
+        const cache=await caches.open('biathlon-field-v6-16');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();
@@ -1133,6 +1148,7 @@
       await refresh().catch(showError);
       sync.schedule();
       if(wakeWanted)requestWake();
+      checkIdleSession().catch(showError);
     }
   });
   window.addEventListener('pagehide',()=>{
@@ -1171,6 +1187,7 @@
         receivedInvitation=null;
       }
       sync.schedule();
+      checkIdleSession().catch(showError);
       if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{
       });
     }catch(error){

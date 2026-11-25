@@ -176,6 +176,17 @@
     equal(s.meta.drafts[oldKey].shots.length,1);
     equal(D.draft(s).number,1);
   });
+  await test('A session is idle after four hours without shots or saves',()=>{
+    const s=setup(),now=Date.now();
+    add(s);
+    equal(D.sessionIdle(s,now),false);
+    equal(D.sessionIdle(s,now+D.IDLE_LIMIT+1000),true);
+    D.touchSession(s);
+    equal(D.sessionIdle(s,Date.now()+D.IDLE_LIMIT-1000),false);
+    // Nothing to ask without athletes in the session
+    s.meta.activeIds=[];
+    equal(D.sessionIdle(s,now+D.IDLE_LIMIT+1000),false);
+  });
   await test('Series counters are independent for athlete, mode and session',()=>{
     const s=setup();
     add(s);

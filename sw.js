@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='biathlon-field-v6-15';
+const CACHE='biathlon-field-v6-16';
 const ASSETS=['./','index.html','styles/app.css','src/domain.js','src/storage.js','src/sync.js','src/updates.js','src/app.js','stats.html','styles/stats.css','src/stats-core.js','src/stats.js','manifest.webmanifest','icons/target.svg','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS.map(url=>new Request(url,{cache:'reload'})))));

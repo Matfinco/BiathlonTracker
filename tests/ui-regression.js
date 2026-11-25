@@ -178,6 +178,32 @@
       assert(/non ha la gestione/.test(element('admin-status').textContent));
     }finally{globalThis.fetch=oldFetch;navigator.onLine=false;}
   });
+  await test('Returning after four hours asks to continue or start a new session',async()=>{
+    const visible=async()=>{for(const fn of document.listeners.visibilitychange||[])await fn();await flush();};
+    for(const d of document.querySelectorAll('dialog'))if(d.open)d.close('cancel');
+    const old=Date.now()-BiathlonDomain.IDLE_LIMIT-60000;
+    __uiRepo.snapshot.meta.lastActivity=old;
+    await __uiRepo.onchange();await flush();
+    await visible();
+    assert(element('confirm-dialog').open,'idle prompt must open');
+    assert(element('confirm-accept').textContent==='Nuova sessione');
+    assert(element('confirm-cancel').textContent==='Continua sessione');
+    // Continue: same session, no new prompt on the next return
+    const session=__uiRepo.snapshot.meta.sessionId;
+    element('confirm-dialog').close('cancel');await flush();
+    assert(__uiRepo.snapshot.meta.sessionId===session);
+    assert(__uiRepo.snapshot.meta.lastActivity>old);
+    await visible();
+    assert(!element('confirm-dialog').open);
+    // New session: opens the attendance dialog with the previous athletes checked
+    __uiRepo.snapshot.meta.lastActivity=old;
+    await __uiRepo.onchange();await flush();
+    await visible();
+    element('confirm-dialog').close('accept');await flush();
+    assert(element('session-dialog').open);
+    assert(element('session-checklist').querySelectorAll('input:checked').length===__uiRepo.snapshot.meta.activeIds.length);
+    element('session-dialog').close();await flush();
+  });
   await test('UI records repeated taps at the same point',async()=>{
     await tap();
     await tap();
