@@ -5,13 +5,16 @@ Da svolgere prima dell’uso in allenamento. Le prove automatiche usano API simu
 ## Schermo e comandi
 
 - Smartphone indicativamente 360 × 640 e 390 × 844, tablet verticale e orizzontale. Verificare anche modalità installata, browser con barre visibili, tastiera aperta e dimensioni testo aumentate.
-- Bersaglio da bordo a bordo, senza limite massimo di larghezza; le proporzioni restano 10:11. In orizzontale lo scorrimento verticale deve funzionare sul bersaglio durante l’inserimento.
-- Salva e Annulla raggiungibili nella barra inferiore; nessun controllo coperto dalle aree di sistema. Le finestre scorrono e il pulsante di chiusura rimane raggiungibile.
+- Il bersaglio occupa lo spazio tra intestazione e barra inferiore, con proporzioni 10:11 e mai meno dell’88% della larghezza: sui telefoni piccoli la pagina scorre di poco. Sul telefono in orizzontale torna a tutta larghezza e lo scorrimento verticale deve funzionare sul bersaglio. Su tablet in orizzontale il bersaglio sta a sinistra e i comandi a destra.
+- Modifica, Storico, Blocca, Svuota, Annulla colpo e Salva sempre visibili nella barra inferiore; nessun controllo coperto dalle aree di sistema. In Modifica la barra mostra solo i numeri dei colpi e “Fine modifica”.
+- Le finestre scorrono e il pulsante di chiusura rimane raggiungibile. Scorrendo dentro il Menu o un’altra finestra la pagina sotto non deve muoversi; alla chiusura la posizione resta quella di prima.
+- Pizzico e doppio tocco non devono ingrandire la pagina (iPhone, iPad e Android).
+- Il pallino sul Menu è verde con tutto inviato, arancione con operazioni in attesa e rosso dopo un invio fallito. Gli avvisi compaiono sotto l’intestazione, spariscono da soli (gli errori restano finché non si toccano).
 - Provare l’interfaccia chiara al sole, con colpi a colori e in bianco e nero. Leggere nome atleta, posizione, modalità e serie senza avvicinare il dispositivo.
 - Con i guanti effettivamente usati: inserire dieci serie, correggere colpi e scegliere il vento. La compatibilità del guanto e la risposta con schermo bagnato dipendono anche dal dispositivo.
 - Due colpi nello stesso punto devono restare due. In Modifica selezionare un numero e provare tocco e trascinamento con vista ingrandita.
 - Inserire colpi in Azzeramento, passare a i1-i2 e poi da Terra a Piedi: tutti i colpi devono restare nelle stesse coordinate, con centri ricalcolati e il progressivo della destinazione. Tornare indietro prima del salvataggio non deve lasciare copie della serie. Se esiste una vecchia serie incompleta nella destinazione, provare sia “Annulla” sia “Salva e sposta”.
-- Dopo aver spostato un colpo, toccare una sola volta “Fine modifica”: la selezione e la lente devono sparire e il comando deve diventare “Modifica colpi”, senza riattivarsi. Ripetere con un tocco rapido subito dopo il trascinamento; scorrere sul pulsante o annullare il tocco non deve attivarlo.
+- Dopo aver spostato un colpo, toccare una sola volta “Fine modifica”: la selezione e la lente devono sparire e il comando deve tornare “Modifica”, senza riattivarsi. Ripetere con un tocco rapido subito dopo il trascinamento; scorrere sul pulsante o annullare il tocco non deve attivarlo.
 - Un gesto di scorrimento, un contatto annullato o un secondo dito non devono aggiungere colpi.
 
 ## Dati e interruzioni

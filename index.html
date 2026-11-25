@@ -2,7 +2,7 @@
 <html lang="it">
  <head>
   <meta charset="utf-8"/>
-  <meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+  <meta content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" name="viewport"/>
   <meta content="#f4f1e8" name="theme-color"/>
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
@@ -29,145 +29,73 @@
   <main aria-busy="true" id="app" inert="">
    <header class="field-header">
     <div class="athlete-row">
-     <label class="sr-only" for="athlete-select">
-      Atleta attuale
-     </label>
+     <label class="sr-only" for="athlete-select">Atleta attuale</label>
      <select aria-label="Atleta attuale" id="athlete-select">
-      <option>
-       Nessun atleta
-      </option>
+      <option>Nessun atleta</option>
      </select>
-     <button aria-label="Apri menu" class="icon-button" id="menu-open">
-      ☰
-     </button>
+     <div class="menu-anchor">
+      <button aria-label="Apri menu" class="icon-button" id="menu-open">☰</button>
+      <button aria-label="Apri stato di sincronizzazione" class="sync-status" id="sync-status" tabindex="-1">Verifica connessione…</button>
+     </div>
     </div>
     <div class="context-row">
-     <button class="secondary" id="position-button">
-      Terra
-     </button>
-     <button class="secondary" id="series-button">
-      Serie 1
-     </button>
-     <label class="sr-only" for="mode-select">
-      Tipo di allenamento
-     </label>
+     <button class="secondary" id="position-button">Terra</button>
+     <button class="secondary" id="series-button">Serie 1</button>
+     <label class="sr-only" for="mode-select">Tipo di allenamento</label>
      <select aria-label="Tipo di allenamento" id="mode-select">
-      <option>
-       Azzeramento
-      </option>
-      <option>
-       Tiro da fermo
-      </option>
-      <option>
-       i1-i2
-      </option>
-      <option>
-       i3
-      </option>
-      <option>
-       i4
-      </option>
-      <option>
-       i5
-      </option>
-      <option>
-       Gara
-      </option>
-      <option>
-       Altro
-      </option>
+      <option>Azzeramento</option>
+      <option>Tiro da fermo</option>
+      <option>i1-i2</option>
+      <option>i3</option>
+      <option>i4</option>
+      <option>i5</option>
+      <option>Gara</option>
+      <option>Altro</option>
      </select>
-    </div>
-    <div class="target-context">
-     <span id="session-label">
-      Sessione
-     </span>
-     <button class="text-button" id="wind-open">
-      Vento: calmo
-     </button>
+     <button class="secondary wind-button" id="wind-open">Vento</button>
     </div>
    </header>
    <section aria-label="Registrazione dei colpi" class="target-section">
     <div aria-label="Bersaglio. Tocca per inserire un colpo." class="target-box" id="target-box" role="group">
      <div aria-hidden="true" class="target-center">
-      <div class="cross horizontal">
-      </div>
-      <div class="cross vertical">
-      </div>
-      <div class="prone-ring">
-      </div>
-      <div class="center-dot">
-      </div>
+      <div class="cross horizontal"></div>
+      <div class="cross vertical"></div>
+      <div class="prone-ring"></div>
+      <div class="center-dot"></div>
      </div>
-     <div id="shots-layer">
-     </div>
-     <div aria-hidden="true" class="aim-preview" hidden="" id="aim-preview">
-     </div>
+     <div id="shots-layer"></div>
+     <strong aria-live="polite" class="target-badge count-badge" id="shot-count">0 / 5 colpi</strong>
+     <span aria-live="polite" class="target-badge miss-badge" id="hit-count">0 errori</span>
+     <div aria-hidden="true" class="aim-preview" hidden="" id="aim-preview"></div>
      <div class="touch-cover" hidden="" id="touch-cover">
-      <strong>
-       Comandi bloccati
-      </strong>
-      <span>
-       Usa “Sblocca” sotto il bersaglio.
-      </span>
+      <strong>Comandi bloccati</strong>
+      <span>Usa “Sblocca” nella barra in basso.</span>
      </div>
     </div>
    </section>
    <section aria-label="Comandi della serie" class="field-controls">
-    <div class="shot-summary">
-     <strong id="shot-count">
-      0 / 5 colpi
-     </strong>
-     <span id="hit-count">
-      0 errori
-     </span>
-     <button aria-pressed="false" class="edit-button" id="edit-button">
-      Modifica colpi
-     </button>
+    <p aria-live="polite" class="storage-status" id="storage-status" role="status">Apertura archivio locale…</p>
+    <p aria-live="polite" class="notice" hidden="" id="notice" role="status"></p>
+    <div class="dock" id="dock">
+     <p class="helper edit-help" hidden="" id="edit-help">Scegli il numero del colpo, poi tocca il punto corretto o trascinalo.</p>
+     <div aria-label="Seleziona un colpo da modificare" class="shot-picker" hidden="" id="shot-picker"></div>
+     <div class="tool-row" id="tool-row">
+      <button aria-pressed="false" class="secondary tool tool-edit edit-button" id="edit-button">Modifica</button>
+      <button class="secondary tool tool-history" id="history-open">Storico</button>
+      <button aria-pressed="false" class="secondary tool tool-lock" id="lock-button">Blocca</button>
+      <button class="secondary tool tool-clear" id="clear-button">Svuota</button>
+     </div>
+     <div class="primary-actions" id="entry-actions">
+      <button class="secondary" id="undo-button">Annulla colpo</button>
+      <button class="primary" id="save-button">Salva serie</button>
+     </div>
+     <div class="review-info" hidden="" id="review-info"></div>
+     <label class="helper" for="review-slider" hidden="" id="review-slider-label">Mostra i colpi in ordine</label>
+     <input hidden="" id="review-slider" max="0" min="0" type="range" value="0"/>
+     <div class="primary-actions" hidden="" id="review-actions">
+      <button class="primary" id="review-exit">Torna all’allenamento</button>
+     </div>
     </div>
-    <div aria-label="Seleziona un colpo da modificare" class="shot-picker" hidden="" id="shot-picker">
-    </div>
-    <p class="helper" hidden="" id="edit-help">
-     Seleziona il numero del colpo, poi tocca il punto corretto sul bersaglio. Puoi anche trascinarlo.
-    </p>
-    <div class="review-info" hidden="" id="review-info">
-    </div>
-    <label class="helper" for="review-slider" hidden="" id="review-slider-label">
-     Mostra i colpi in ordine
-    </label>
-    <input hidden="" id="review-slider" max="0" min="0" type="range" value="0"/>
-    <div class="primary-actions" id="entry-actions">
-     <button class="secondary" id="undo-button">
-      Annulla colpo
-     </button>
-     <button class="primary" id="save-button">
-      Salva serie
-     </button>
-    </div>
-    <div class="secondary-actions">
-     <button class="secondary" id="history-open">
-      Storico
-     </button>
-     <button aria-pressed="false" class="secondary" id="lock-button">
-      Blocca
-     </button>
-     <button class="text-button danger-text" id="clear-button">
-      Svuota serie
-     </button>
-    </div>
-    <div class="primary-actions" hidden="" id="review-actions">
-     <button class="primary" id="review-exit">
-      Torna all’allenamento
-     </button>
-    </div>
-    <p aria-live="polite" class="storage-status" id="storage-status" role="status">
-     Apertura archivio locale…
-    </p>
-    <button aria-label="Apri stato di sincronizzazione" class="sync-status" id="sync-status">
-     Verifica connessione…
-    </button>
-    <p aria-live="polite" class="notice" hidden="" id="notice" role="status">
-    </p>
    </section>
   </main>
   <section aria-live="polite" class="startup" id="startup">

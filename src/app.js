@@ -70,10 +70,14 @@
     b.addEventListener('click',action);
     return b;
   }
+  let noticeTimer=0;
   function notify(message,error=false){
     $('notice').textContent=message;
     $('notice').classList.toggle('error',error);
     $('notice').hidden=false;
+    // Floating notice: confirmations fade out, errors stay until tapped
+    clearTimeout(noticeTimer);
+    if(!error)noticeTimer=setTimeout(()=>{$('notice').hidden=true;},5000);
     const open=Array.from(document.querySelectorAll('dialog[open]')).at(-1);
     if(open&&open.id!=='confirm-dialog'){
       let area=open.querySelector('.dialog-notice');
@@ -148,6 +152,9 @@
   function windText(w){
     return !w||w.int===0?'Vento: calmo':`Vento: ${arrows[w.dir]} ${w.int}/5`;
   }
+  function windShort(w){
+    return !w||w.int===0?'calmo':`${arrows[w.dir]} ${w.int}`;
+  }
   function windFlag(level){
     // Keep the six visual references from the original field interface.
     const angle=[90,75,60,45,25,0][level]??90;
@@ -192,28 +199,31 @@
     }
     $('mode-select').disabled=isReview||locked;
     const position=isReview?r.position:m.currentPos;
-    $('position-button').textContent=position==='T'?'Terra':'Piedi';
+    // Short label leaves room for the training type
+    $('position-button').textContent=position==='T'?'T':'P';
+    $('position-button').setAttribute('aria-label',`Posizione: ${position==='T'?'Terra':'Piedi'}`);
     $('position-button').disabled=isReview||locked;
-    $('series-button').textContent=`${isReview?'Rivedi':'Serie'} ${isReview?r.series:(d?.number||1)}`;
+    $('series-button').textContent=`Serie ${isReview?r.series:(d?.number||1)}`;
     $('series-button').disabled=isReview||locked||!d;
-    const session=state.sessions.find(s=>s.id===(active?.sessionId||m.sessionId));
-    $('session-label').textContent=(isReview?'Storico · ':'')+(session?.title||'Sessione');
     const displayedWind=isReview?{
       dir:r.windDir,int:r.windInt
     }:(d?.wind||m.currentWind);
-    $('wind-open').replaceChildren(windFlag(displayedWind.int),node('span',windText(displayedWind)));
+    $('wind-open').replaceChildren(windFlag(displayedWind.int),node('span',windShort(displayedWind)));
+    $('wind-open').setAttribute('aria-label',windText(displayedWind));
     $('wind-open').disabled=isReview||locked;
     $('shot-count').textContent=isReview?`${values.length} colpi`:`${values.length} / ${m.shotLimit} colpi`;
     // Biathlon counts misses, not hits
     $('hit-count').textContent=missText(values.filter(s=>s.esito!=='Bersaglio').length);
     $('edit-button').hidden=isReview;
-    const editLabel=editing?'Fine modifica':'Modifica colpi';
+    const editLabel=editing?'Fine modifica':'Modifica';
     if($('edit-button').textContent!==editLabel)$('edit-button').textContent=editLabel;
     $('edit-button').setAttribute('aria-pressed',String(editing));
     $('edit-button').disabled=locked||!values.length;
     $('edit-help').hidden=!editing||isReview;
     $('shot-picker').hidden=!editing||isReview;
     $('target-box').classList.toggle('editing',editing&&!isReview);
+    $('dock').classList.toggle('editing',editing&&!isReview);
+    $('tool-row').hidden=isReview;
     $('entry-actions').hidden=isReview;
     $('review-actions').hidden=!isReview;
     $('clear-button').hidden=isReview;
@@ -221,7 +231,7 @@
     $('save-button').disabled=locked||!d?.shots.length;
     $('save-button').textContent=d?.replacesId?'Salva correzione':'Salva serie';
     $('clear-button').disabled=locked||!d||(!d.shots.length&&!d.replacesId);
-    $('clear-button').textContent=d?.replacesId?'Annulla correzione':'Svuota serie';
+    $('clear-button').textContent=d?.replacesId?'Annulla correzione':'Svuota';
     $('lock-button').textContent=locked?'Sblocca':'Blocca';
     $('lock-button').setAttribute('aria-pressed',String(locked));
     $('touch-cover').hidden=!locked;
@@ -275,6 +285,8 @@
     if(count&&(!m.cloudUrl||!m.coachName||!m.apiToken))message=`${count} operazioni da inviare · attiva il tuo accesso personale`;
     if(lastSyncError&&navigator.onLine&&count)message=`Invio da riprovare · ${count} operazioni conservate`;
     $('sync-status').textContent=message;
+    // Colored dot on the menu button
+    $('sync-status').dataset.tone=lastSyncError&&count?'error':count?'pending':last?'ok':'idle';
     $('menu-sync-info').textContent=lastSyncError||message;
   }
   function openDialog(id){
@@ -290,6 +302,30 @@
       $('series-number').value=currentDraft()?.number||1;
     }
     $(id).showModal();
+    lockScroll();
+  }
+  let scrollLock=null;
+  function lockScroll(){
+    // Keep the page behind an open dialog still, including on iOS
+    const open=document.querySelector('dialog[open]');
+    const body=document.body;
+    if(open&&!scrollLock){
+      scrollLock={y:window.scrollY||0};
+      document.documentElement?.classList.add('modal-open');
+      if(body?.style){
+        body.style.top=`-${scrollLock.y}px`;
+        body.classList.add('modal-open');
+      }
+    }else if(!open&&scrollLock){
+      const y=scrollLock.y;
+      scrollLock=null;
+      document.documentElement?.classList.remove('modal-open');
+      if(body?.style){
+        body.classList.remove('modal-open');
+        body.style.top='';
+      }
+      window.scrollTo?.(0,y);
+    }
   }
   async function confirmAction(title,message,label='Conferma',{cancel='Annulla',tone='danger'}={}){
     if(confirming)return false;
@@ -302,6 +338,7 @@
     $('confirm-cancel').textContent=cancel;
     dialog.returnValue='cancel';
     dialog.showModal();
+    lockScroll();
     return new Promise(resolve=>dialog.addEventListener('close',()=>{
       confirming=false;
       resolve(dialog.returnValue==='accept');
@@ -950,6 +987,20 @@
   $('menu-open').addEventListener('click',()=>openDialog('menu-dialog'));
   $('sync-status').addEventListener('click',()=>openDialog('menu-dialog'));
   $('history-open').addEventListener('click',()=>openDialog('history-dialog'));
+  for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('close',lockScroll);
+  $('notice').addEventListener('click',()=>{$('notice').hidden=true;});
+  // iOS ignores user-scalable=no, so block pinch zoom here
+  document.addEventListener('gesturestart',e=>e.preventDefault());
+  if(window.ResizeObserver){
+    const measure=()=>{
+      const root=document.documentElement.style;
+      root.setProperty('--head-h',`${document.querySelector('.field-header').offsetHeight}px`);
+      root.setProperty('--dock-h',`${$('dock').offsetHeight}px`);
+    };
+    const observer=new ResizeObserver(measure);
+    observer.observe(document.querySelector('.field-header'));
+    observer.observe($('dock'));
+  }
   document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
   document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openDialog(b.dataset.open)));
   for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',e=>{
