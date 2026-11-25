@@ -1076,7 +1076,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-12');
+        const cache=await caches.open('biathlon-field-v6-13');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();

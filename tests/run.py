@@ -49,7 +49,7 @@ try:
     for source in sources:
         evaluate('new Function(' + json.dumps(source.read_text()) + '); "compiled"')
     evaluate((ROOT / 'tests/platform.js').read_text())
-    for name in ['src/domain.js', 'src/storage.js', 'src/sync.js', 'src/updates.js', 'backend/Code.gs', 'tests/regression.js']:
+    for name in ['src/domain.js', 'src/storage.js', 'src/sync.js', 'src/updates.js', 'src/stats-core.js', 'backend/Code.gs', 'tests/regression.js']:
         evaluate((ROOT / name).read_text())
     # Entering/leaving JSC drains promise microtasks. All network and timers are simulated.
     for _ in range(1000):
@@ -117,6 +117,12 @@ try:
     assert references.issubset(ids), 'Missing UI elements: ' + str(references - set(ids))
     for name in re.findall(r"'([^']+\.(?:js|css|html|webmanifest|svg|png))'", (ROOT / 'sw.js').read_text()):
         assert (ROOT / name).is_file(), 'Missing offline asset: ' + name
+    stats_html = (ROOT / 'stats.html').read_text()
+    stats_ids = re.findall(r'\bid="([^"]+)"', stats_html)
+    assert len(stats_ids) == len(set(stats_ids)), 'Duplicate statistics HTML IDs'
+    stats_refs = set(re.findall(r"\$\('([^']+)'\)", (ROOT / 'src/stats.js').read_text()))
+    stats_refs |= set(re.findall(r"\['([a-z]+-[a-z-]+)',", (ROOT / 'src/stats.js').read_text()))
+    assert stats_refs.issubset(stats_ids), 'Missing statistics elements: ' + str(stats_refs - set(stats_ids))
     print('PASS UI references, unique IDs and offline assets')
     passed = sum(r['ok'] for r in results) + 1
     total = len(results) + 1

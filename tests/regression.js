@@ -563,6 +563,10 @@
     }
     hideSheet(){
     }
+    clearContents(){
+      this.grid=[];
+      return this;
+    }
     getRangeList(ranges){
       return {
         setValue:value=>ranges.forEach(r=>{
@@ -994,6 +998,163 @@
   });
   await test('Server appends by actual IDs rather than distant formulas',()=>{server();sheets.Database.grid[20]=['','','formula'];const p=serverPacket();equal(post({inserts:[p]}).status,'success');equal(sheets.Database.grid[1][0],p.id);equal(sheets.Database.grid[20][2],'formula');});
   await test('Server expands the sheet before writing beyond its row limit',()=>{server();sheets.Database.maxRows=1;const p=serverPacket();equal(post({inserts:[p]}).status,'success');assert(sheets.Database.getMaxRows()>=2);});
+  function databaseReads(fn){
+    const original=Range.prototype.getValues;let cells=0;
+    Range.prototype.getValues=function(){if(this.sheet===sheets.Database)cells+=this.nr*this.nc;return original.call(this);};
+    try{fn();}finally{Range.prototype.getValues=original;}
+    return cells;
+  }
+  await test('Server index keeps writes from reading every stored shot',()=>{
+    server();
+    const many=Array.from({length:40},()=>serverPacket());
+    equal(post({inserts:many}).status,'success');
+    equal(sheets._BiathlonIndex.getLastRow(),41);
+    const cells=databaseReads(()=>equal(post({inserts:[serverPacket()]}).status,'success'));
+    assert(cells<20,'read '+cells+' cells');
+    equal(sheets.Database.getLastRow(),42);
+  });
+  await test('Server index rejects duplicates across requests and index loss',()=>{
+    server();
+    const p=serverPacket();
+    post({inserts:[p]});post({inserts:[p,p]});
+    equal(sheets.Database.getLastRow(),2);
+    delete sheets._BiathlonIndex;
+    post({inserts:[p]});
+    equal(sheets.Database.getLastRow(),2);
+    equal(sheets._BiathlonIndex.getLastRow(),2);
+  });
+  await test('Server index rebuilds after rows added by hand or an interrupted request',()=>{
+    server();
+    const p=serverPacket(),q=serverPacket();
+    post({inserts:[p]});
+    // Simulate rows written but index state not saved
+    sheets.Database.grid.push([q.id,'2026-01-01','Gara','Coach','Atleta A','T','1T',1,200,220,0,'Bersaglio','C',0,'FALSE','1','s','t']);
+    post({inserts:[q]});
+    equal(sheets.Database.getLastRow(),3);
+    equal(sheets._BiathlonIndex.getLastRow(),3);
+  });
+  await test('Server deletion finds the right rows after the sheet is sorted by hand',()=>{
+    server();
+    const a=serverPacket(),b=serverPacket(),c=serverPacket();
+    post({inserts:[a,b,c]});
+    const header=sheets.Database.grid[0],body=sheets.Database.grid.slice(1).reverse();
+    sheets.Database.grid=[header,...body];
+    equal(post({deletes:[c.id]}).status,'success');
+    const flags=Object.fromEntries(sheets.Database.grid.slice(1).map(r=>[r[0],r[14]]));
+    equal(flags[c.id],'TRUE');equal(flags[a.id],'FALSE');equal(flags[b.id],'FALSE');
+    equal(post({inserts:[c]}).status,'success');
+    equal(sheets.Database.getLastRow(),4);
+  });
+  await test('Server index keeps series of other coaches protected',()=>{
+    server();
+    const p=serverPacket();
+    post({inserts:[p]});
+    const response=post({token:'other-token',deletes:[p.id]});
+    equal(response.status,'error');
+    equal(sheets.Database.grid[1][14],'FALSE');
+  });
+  const St=BiathlonStats;
+  function archiveAll(token='coach-token'){
+    const map=new Map();let state={cursor:1,cursorId:'',tombCursor:1},pages=0,r;
+    do{
+      r=doPost({postData:{contents:JSON.stringify({token,action:'archive',...state})}});
+      equal(r.status,'success');
+      St.applyArchivePage(map,r);
+      state={cursor:r.cursor,cursorId:r.cursorId,tombCursor:r.tombCursor};
+    }while(!r.done&&++pages<50);
+    return {map,state,last:r};
+  }
+  await test('Archive returns the series of every coach, page by page',()=>{
+    server();
+    BIATHLON_ARCHIVE_PAGE=2;
+    try{
+      const mine=serverPacket(),theirs=serverPacket();theirs.coach='Other Coach';
+      post({inserts:[mine]});post({token:'other-token',inserts:[theirs]});
+      const extra=serverPacket();extra.shots=[1,2,3].map(seq=>({seq,x:200+seq,y:220}));
+      post({inserts:[extra]});
+      const {map}=archiveAll();
+      equal(map.size,3);
+      equal(map.get(theirs.id).coach,'Other Coach');
+      // A series split across pages is reassembled once
+      equal(map.get(extra.id).shots.map(s=>s.seq),[1,2,3]);
+    }finally{BIATHLON_ARCHIVE_PAGE=5000;}
+  });
+  await test('Archive download is incremental and receives later deletions',()=>{
+    server();
+    const a=serverPacket(),b=serverPacket();
+    post({inserts:[a]});
+    const first=archiveAll();
+    post({inserts:[b]});post({deletes:[a.id]});
+    const r=doPost({postData:{contents:JSON.stringify({token:'coach-token',action:'archive',...first.state})}});
+    equal(r.reset,false);
+    equal(r.rows.length,1);
+    St.applyArchivePage(first.map,r);
+    equal(Array.from(first.map.keys()),[b.id]);
+  });
+  await test('Archive restarts from the beginning after the sheet is sorted by hand',()=>{
+    server();
+    const a=serverPacket(),b=serverPacket();
+    post({inserts:[a,b]});
+    const first=archiveAll();
+    const header=sheets.Database.grid[0];sheets.Database.grid=[header,...sheets.Database.grid.slice(1).reverse()];
+    const r=doPost({postData:{contents:JSON.stringify({token:'coach-token',action:'archive',...first.state})}});
+    equal(r.reset,true);
+    equal(r.rows.length,2);
+  });
+  await test('Archive refuses requests without a valid coach key',()=>{
+    server();
+    post({inserts:[serverPacket()]});
+    equal(doPost({postData:{contents:JSON.stringify({token:'wrong-token-value',action:'archive'})}}).status,'error');
+  });
+  function statSeries(over){
+    return {id:over.id||'s'+Math.random(),date:'2026-11-20',type:'i3',coach:'Coach',athlete:'Anna',athleteId:'a1',position:'T',series:'1T',number:1,windDir:'C',windInt:0,shots:[],...over};
+  }
+  await test('Statistics filter by period, athlete, coach, shot number and result',()=>{
+    const hit={seq:1,x:200,y:220,esito:'Bersaglio'},miss={seq:2,x:300,y:220,esito:'Errore'};
+    const list=[
+      statSeries({id:'1',shots:[hit,miss]}),
+      statSeries({id:'2',date:'2026-11-25',coach:'Other',shots:[hit]}),
+      statSeries({id:'3',athleteId:'b2',athlete:'Bea',shots:[miss]})
+    ];
+    const base={from:'',to:'',athletes:null,coaches:null,types:null,seqs:null,number:0,esito:'all',windMin:0,windMax:5};
+    equal(St.shots(list,base).length,4);
+    equal(St.shots(list,{...base,from:'2026-11-21'}).length,1);
+    equal(St.shots(list,{...base,athletes:new Set(['a1'])}).length,3);
+    equal(St.shots(list,{...base,coaches:new Set(['Coach'])}).length,3);
+    equal(St.shots(list,{...base,seqs:new Set([2])}).length,2);
+    equal(St.shots(list,{...base,esito:'miss'}).length,2);
+    equal(St.shots(list,{...base,windMin:1}).length,0);
+  });
+  await test('Statistics compute percentage per shot number and mean point in millimetres',()=>{
+    const list=[statSeries({shots:[{seq:1,x:200,y:220,esito:'Bersaglio'},{seq:2,x:236,y:184,esito:'Bersaglio'}]}),statSeries({position:'P',series:'1P',shots:[{seq:1,x:20,y:220,esito:'Errore'}]})];
+    const sum=St.summary(St.shots(list,{esito:'all'}));
+    equal(sum.T.pct,100);
+    equal(sum.P.pct,0);
+    equal(sum.T.perSeq.map(g=>g.seq),[1,2]);
+    assert(Math.abs(sum.T.mpi.right-18*57.5/180)<1e-9);
+    assert(Math.abs(sum.T.mpi.up-18*57.5/180)<1e-9);
+    equal(St.offsetText(sum.T.mpi),'5,8 mm a destra · 5,8 mm in alto');
+    equal(sum.P.mpi.right<0,true);
+  });
+  await test('Statistics merge Google archive with unsent local series and pending deletes',()=>{
+    const s=setup();add(s);const local=save(s);add(s);const gone=save(s);
+    D.removeSeries(s,gone.id);
+    const archived=statSeries({id:'remote'}),deletedRemote=statSeries({id:gone.id});
+    const merged=St.mergeSources([archived,deletedRemote],s);
+    equal(merged.map(x=>x.id).sort(),['remote',local.id].sort());
+    equal(merged.find(x=>x.id===local.id).source,'local');
+  });
+  await test('Statistics colour groups and quick periods',()=>{
+    const shot={hit:true,seq:1,series:statSeries({number:3,windInt:4})};
+    equal(St.colorKey(shot,'esito'),'hit');
+    equal(St.colorKey(shot,'series'),'3');
+    equal(St.colorKey(shot,'wind'),'4');
+    equal(St.colorKey(shot,'athlete'),'a1');
+    const now=new Date(2026,10,25,12);
+    equal(St.period('today',now),{from:'2026-11-25',to:'2026-11-25'});
+    equal(St.period('7',now),{from:'2026-11-19',to:'2026-11-25'});
+    equal(St.period('all',now),{from:'',to:''});
+  });
   await test('Saving a correction of an archived series returns new series to the current session',()=>{
     const s=setup();add(s);const old=save(s),oldSession=s.meta.sessionId;
     D.startSession(s,['1']);const today=s.meta.sessionId;

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="it">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+  <meta content="#f4f1e8" name="theme-color"/>
+  <meta content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://script.google.com https://*.googleusercontent.com; object-src 'none'; base-uri 'self'; form-action 'none'" http-equiv="Content-Security-Policy"/>
+  <title>Statistiche tiro</title>
+  <link href="manifest.webmanifest" rel="manifest"/>
+  <link href="icons/target.svg" rel="icon" type="image/svg+xml"/>
+  <link href="styles/stats.css" rel="stylesheet"/>
+  <script defer="" src="src/domain.js"></script>
+  <script defer="" src="src/storage.js"></script>
+  <script defer="" src="src/sync.js"></script>
+  <script defer="" src="src/stats-core.js"></script>
+  <script defer="" src="src/stats.js"></script>
+ </head>
+ <body>
+  <header class="stats-bar">
+   <a class="back-link" href="./">← Poligono</a>
+   <h1>Statistiche tiro</h1>
+   <p aria-live="polite" class="data-status" id="data-status" role="status">Caricamento…</p>
+   <button class="secondary" id="archive-refresh" type="button">Aggiorna dati</button>
+   <button aria-controls="filters" aria-expanded="false" class="secondary filters-toggle" id="filters-toggle" type="button">Filtri</button>
+  </header>
+  <p class="rotate-hint">Ruota il telefono in orizzontale per vedere i due bersagli affiancati.</p>
+  <div class="stats-layout">
+   <aside aria-label="Filtri" class="filters" id="filters">
+    <section>
+     <h2>Periodo</h2>
+     <div class="chips" data-target="a" id="period-quick">
+      <button data-period="today" type="button">Oggi</button>
+      <button data-period="7" type="button">7 giorni</button>
+      <button data-period="30" type="button">30 giorni</button>
+      <button data-period="all" type="button">Tutto</button>
+     </div>
+     <label for="day-select">Giornata</label>
+     <select id="day-select"></select>
+     <div class="date-pair">
+      <label>Dal <input id="date-from" type="date"/></label>
+      <label>Al <input id="date-to" type="date"/></label>
+     </div>
+     <label class="check"><input id="compare-toggle" type="checkbox"/> Confronta con un altro periodo</label>
+     <div class="compare-fields" hidden="" id="compare-fields">
+      <p class="period-tag period-b">Periodo B</p>
+      <div class="chips" data-target="b" id="compare-quick">
+       <button data-period="today" type="button">Oggi</button>
+       <button data-period="7" type="button">7 giorni</button>
+       <button data-period="30" type="button">30 giorni</button>
+       <button data-period="all" type="button">Tutto</button>
+      </div>
+      <label for="day-select-b">Giornata</label>
+      <select id="day-select-b"></select>
+      <div class="date-pair">
+       <label>Dal <input id="date-from-b" type="date"/></label>
+       <label>Al <input id="date-to-b" type="date"/></label>
+      </div>
+     </div>
+    </section>
+    <section>
+     <h2>Colori</h2>
+     <div class="segmented" id="color-mode">
+      <button aria-pressed="true" data-mode="esito" type="button">Esito</button>
+      <button aria-pressed="false" data-mode="athlete" type="button">Atleta</button>
+      <button aria-pressed="false" data-mode="series" type="button">N. serie</button>
+      <button aria-pressed="false" data-mode="wind" type="button">Vento</button>
+     </div>
+    </section>
+    <section>
+     <h2>Atleti</h2>
+     <div class="check-list" id="athlete-list"></div>
+    </section>
+    <section>
+     <h2>Allenatori</h2>
+     <div class="check-list" id="coach-list"></div>
+    </section>
+    <section>
+     <h2>Tipo di allenamento</h2>
+     <div class="check-list" id="type-list"></div>
+    </section>
+    <section>
+     <h2>Serie e colpi</h2>
+     <label for="series-number">Numero serie</label>
+     <select id="series-number"></select>
+     <p class="field-label">Numero colpo</p>
+     <div class="chips" id="seq-list"></div>
+     <p class="field-label">Esito</p>
+     <div class="segmented" id="esito-mode">
+      <button aria-pressed="true" data-esito="all" type="button">Tutti</button>
+      <button aria-pressed="false" data-esito="hit" type="button">Centri</button>
+      <button aria-pressed="false" data-esito="miss" type="button">Errori</button>
+     </div>
+    </section>
+    <section>
+     <h2>Vento</h2>
+     <div class="date-pair">
+      <label>Da <select id="wind-min"></select></label>
+      <label>A <select id="wind-max"></select></label>
+     </div>
+    </section>
+    <button class="secondary wide" id="filters-reset" type="button">Azzera filtri</button>
+   </aside>
+   <main class="stats-main">
+    <div class="targets">
+     <section class="target-panel" id="panel-T">
+      <header class="panel-head">
+       <h2>Terra</h2>
+       <p class="panel-pct"></p>
+      </header>
+      <p class="panel-meta"></p>
+      <p class="panel-mpi"></p>
+      <canvas aria-label="Bersaglio a terra con i colpi filtrati. Tocca un colpo per i dettagli della serie." class="target-canvas" role="img"></canvas>
+      <ul class="legend"></ul>
+      <h3>Percentuale per numero di colpo</h3>
+      <div class="bars"></div>
+     </section>
+     <section class="target-panel" id="panel-P">
+      <header class="panel-head">
+       <h2>Piedi</h2>
+       <p class="panel-pct"></p>
+      </header>
+      <p class="panel-meta"></p>
+      <p class="panel-mpi"></p>
+      <canvas aria-label="Bersaglio in piedi con i colpi filtrati. Tocca un colpo per i dettagli della serie." class="target-canvas" role="img"></canvas>
+      <ul class="legend"></ul>
+      <h3>Percentuale per numero di colpo</h3>
+      <div class="bars"></div>
+     </section>
+    </div>
+    <section aria-live="polite" class="detail" hidden="" id="detail">
+     <div class="detail-head">
+      <h2 id="detail-title"></h2>
+      <button aria-label="Chiudi dettaglio" class="secondary icon" id="detail-close" type="button">×</button>
+     </div>
+     <p id="detail-info"></p>
+     <ol class="detail-shots" id="detail-shots"></ol>
+     <button aria-pressed="false" class="secondary" id="detail-focus" type="button">Mostra solo questa serie</button>
+    </section>
+   </main>
+  </div>
+ </body>
+</html>

@@ -1,6 +1,6 @@
 'use strict';
-const CACHE='biathlon-field-v6-12';
-const ASSETS=['./','index.html','styles/app.css','src/domain.js','src/storage.js','src/sync.js','src/updates.js','src/app.js','manifest.webmanifest','icons/target.svg','icons/icon-192.png','icons/icon-512.png'];
+const CACHE='biathlon-field-v6-13';
+const ASSETS=['./','index.html','styles/app.css','src/domain.js','src/storage.js','src/sync.js','src/updates.js','src/app.js','stats.html','styles/stats.css','src/stats-core.js','src/stats.js','manifest.webmanifest','icons/target.svg','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS.map(url=>new Request(url,{cache:'reload'})))));
 });
@@ -17,7 +17,8 @@ self.addEventListener('fetch',event=>{
   // Cloud requests are never cached or replayed by the service worker.
   if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
   event.respondWith(caches.open(CACHE).then(async cache=>{
-    if(event.request.mode==='navigate')return await cache.match(new URL('index.html',self.registration.scope).href)||fetch(event.request);
+    // Each cached page opens itself; unknown addresses fall back to the field app
+    if(event.request.mode==='navigate')return await cache.match(event.request,{ignoreSearch:true})||await cache.match(new URL('index.html',self.registration.scope).href)||fetch(event.request);
     return await cache.match(event.request)||fetch(event.request);
   }));
 });

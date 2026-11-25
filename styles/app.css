@@ -439,6 +439,21 @@ dialog::backdrop{
 }.menu-grid>button{
   margin:0;
   text-align:left
+}.button-link{
+  display:flex;
+  border:2px solid transparent;
+  align-items:center;
+  min-height:56px;
+  padding:12px 14px;
+  border-radius:10px;
+  font-weight:700;
+  line-height:1.15;
+  background:var(--accent);
+  color:var(--on-accent);
+  text-decoration:none
+}.button-link:focus-visible{
+  outline:4px solid var(--focus);
+  outline-offset:2px
 }.form-grid{
   display:grid;
   grid-template-columns:1fr 1fr;

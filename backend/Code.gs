@@ -103,6 +103,119 @@ function writeRows_(sheet,start,rows,width){
   if(required>sheet.getMaxRows())sheet.insertRowsAfter(sheet.getMaxRows(),required-sheet.getMaxRows());
   sheet.getRange(start,1,rows.length,width).setValues(rows);
 }
+/* Series index: one row per series, so writes never read every shot */
+var BIATHLON_INDEX_SHEET='_BiathlonIndex',BIATHLON_INDEX_STATE='BIATHLON_INDEX_STATE';
+var BIATHLON_INDEX_HEADERS=['ID','Allenatore','PrimaRiga','Righe','Eliminato'];
+function indexSheet_(ss){
+  var sheet=ss.getSheetByName(BIATHLON_INDEX_SHEET);
+  if(!sheet){
+    sheet=ss.insertSheet(BIATHLON_INDEX_SHEET);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
+function rebuildIndex_(ss,sheet,name){
+  var idx=indexSheet_(ss),last=lastDataRow_(sheet),n=last-1,byId=Object.create(null),order=[];
+  if(n>0){
+    var ids=sheet.getRange(2,1,n,1).getValues(),coaches=sheet.getRange(2,4,n,1).getValues(),flags=sheet.getRange(2,15,n,1).getValues();
+    for(var i=0;i<n;i++){
+      var rid=String(ids[i][0]).trim();
+      if(!rid)continue;
+      var e=byId[rid];
+      if(!e){
+        e=byId[rid]={id:rid,coach:String(coaches[i][0]).replace(/^'/,'').trim(),first:i+2,last:i+2,deleted:false};
+        order.push(e);
+      }
+      // A span with foreign rows inside fails verification and falls back to a scan
+      e.last=i+2;
+      if(String(flags[i][0]).toUpperCase()==='TRUE')e.deleted=true;
+    }
+  }
+  idx.clearContents();
+  var rows=[BIATHLON_INDEX_HEADERS].concat(order.map(function(e,k){
+    e.indexRow=k+2;
+    e.count=e.last-e.first+1;
+    return [e.id,cell_(e.coach),e.first,e.count,e.deleted?'TRUE':'FALSE'];
+  }));
+  writeRows_(idx,1,rows,5);
+  PropertiesService.getScriptProperties().setProperty(BIATHLON_INDEX_STATE,JSON.stringify({sheet:name,lastRow:last}));
+  return {sheet:idx,byId:byId,lastRow:last,nextRow:order.length+2};
+}
+function seriesIndex_(ss,sheet,name){
+  var raw=PropertiesService.getScriptProperties().getProperty(BIATHLON_INDEX_STATE),state=null;
+  try{state=raw?JSON.parse(raw):null;}catch(error){state=null;}
+  var idx=ss.getSheetByName(BIATHLON_INDEX_SHEET);
+  var valid=Boolean(state&&idx&&state.sheet===name&&Number.isInteger(state.lastRow)&&state.lastRow>=1&&String(idx.getRange(1,1).getValue())==='ID');
+  if(valid){
+    // Rows added or removed by hand move the end of the data: rebuild in that case
+    var probe=sheet.getRange(state.lastRow,1,2,1).getValues();
+    valid=String(probe[0][0]).trim()!==''&&String(probe[1][0]).trim()==='';
+  }
+  if(!valid)return rebuildIndex_(ss,sheet,name);
+  var last=idx.getLastRow(),rows=last>1?idx.getRange(2,1,last-1,5).getValues():[],byId=Object.create(null);
+  rows.forEach(function(row,i){
+    var rid=String(row[0]).trim();
+    if(rid)byId[rid]={id:rid,coach:String(row[1]).replace(/^'/,'').trim(),first:Number(row[2]),count:Number(row[3]),deleted:String(row[4]).toUpperCase()==='TRUE',indexRow:i+2};
+  });
+  return {sheet:idx,byId:byId,lastRow:state.lastRow,nextRow:Math.max(2,last+1)};
+}
+// Rows of one series, verified by ID because the sheet may have been sorted by hand
+function seriesRows_(sheet,entry){
+  var result=[],i;
+  if(entry.first>=2&&entry.count>=1){
+    var values=sheet.getRange(entry.first,1,entry.count,1).getValues();
+    if(values.every(function(v){return String(v[0])===entry.id;})){
+      for(i=0;i<entry.count;i++)result.push(entry.first+i);
+      return {rows:result,stale:false};
+    }
+  }
+  var last=lastDataRow_(sheet),ids=last>1?sheet.getRange(2,1,last-1,1).getValues():[];
+  for(i=0;i<ids.length;i++)if(String(ids[i][0])===entry.id)result.push(i+2);
+  return {rows:result,stale:true};
+}
+var BIATHLON_ARCHIVE_PAGE=5000;
+function isDate_(value){
+  return Object.prototype.toString.call(value)==='[object Date]';
+}
+// Sheets may turn written dates into Date cells: send them back as text
+function dayText_(value){
+  if(isDate_(value))return Utilities.formatDate(value,Session.getScriptTimeZone(),'yyyy-MM-dd');
+  return String(value==null?'':value).trim();
+}
+function timeText_(value){
+  if(isDate_(value))return value.toISOString();
+  return String(value==null?'':value).trim();
+}
+/* Shared archive for statistics: every authorized coach reads all series, page by page */
+function archive_(ss,authorized,data){
+  var name=databaseSheetName_(ss),sheet=database_(ss),index=seriesIndex_(ss,sheet,name),last=index.lastRow;
+  var cursor=Number(data.cursor),reset=false;
+  if(!Number.isInteger(cursor)||cursor<1)cursor=1;
+  // The client remembers the ID of its last row: a sorted or shortened sheet restarts the download
+  if(cursor>1&&(cursor>last||String(sheet.getRange(cursor,1).getValue())!==String(data.cursorId||''))){
+    cursor=1;
+    reset=true;
+  }
+  if(cursor===1&&Number(data.cursor)>1)reset=true;
+  var end=Math.min(last,cursor+BIATHLON_ARCHIVE_PAGE),rows=[];
+  if(end>cursor){
+    rows=sheet.getRange(cursor+1,1,end-cursor,18).getValues().filter(function(r){return String(r[0]).trim();}).map(function(r){
+      return [String(r[0]).trim(),dayText_(r[1]),String(r[2]),String(r[3]).replace(/^'/,''),String(r[4]).replace(/^'/,''),String(r[5]),String(r[6]),Number(r[7]),Number(r[8]),Number(r[9]),String(r[11]),String(r[12]),Number(r[13])||0,String(r[14]).toUpperCase()==='TRUE',String(r[15]||''),String(r[16]||''),timeText_(r[17])];
+    });
+  }
+  var tomb=ss.getSheetByName('_BiathlonDeleted'),tombLast=tomb?tomb.getLastRow():1,tombCursor=Number(data.tombCursor),tombstones=[];
+  if(!Number.isInteger(tombCursor)||tombCursor<1||tombCursor>tombLast||reset||cursor===1)tombCursor=1;
+  if(tomb&&tombLast>tombCursor)tombstones=tomb.getRange(tombCursor+1,1,tombLast-tombCursor,1).getValues().map(function(r){return String(r[0]);}).filter(String);
+  return json_({
+    status:'success',protocolVersion:2,coach:authorized.name,reset:reset,rows:rows,
+    cursor:end,cursorId:end>1?String(sheet.getRange(end,1).getValue()):'',done:end>=last,
+    tombstones:tombstones,tombCursor:Math.max(1,tombLast)
+  });
+}
+/** Run from the editor after editing the shots tab by hand: the next request rebuilds the index */
+function ricostruisciIndiceBiathlon(){
+  PropertiesService.getScriptProperties().deleteProperty(BIATHLON_INDEX_STATE);
+}
 function databaseSheetName_(ss){
   var name=PropertiesService.getScriptProperties().getProperty('BIATHLON_DATABASE_SHEET');
   if(!name)name=ss.getSheetByName('Database_Colpi')?'Database_Colpi':'Database';
@@ -195,16 +308,11 @@ function doPost(e){
         status:'success',protocolVersion:2,coach:authorized.name,roster:listed.roster
       });
     }
-    var sheet=database_(ss),last=lastDataRow_(sheet),rows=last>1?sheet.getRange(2,1,last-1,18).getValues():[],existing=Object.create(null);
-    var requestedIds=Object.create(null);
-    packets.forEach(function(p){
-      requestedIds[p.id]=true;
-    });
-    deletes.forEach(function(value){
-      requestedIds[value]=true;
-    });
-    rows.forEach(function(row){
-      if(requestedIds[String(row[0])]&&String(row[3]).replace(/^'/,'').trim()!==authorized.name)throw Error('Non puoi modificare o cancellare le serie di un altro allenatore.');
+    if(data.action==='archive')return archive_(ss,authorized,data);
+    var sheetName=databaseSheetName_(ss),sheet=database_(ss),index=seriesIndex_(ss,sheet,sheetName);
+    packets.concat(deletes.map(function(value){return {id:value};})).forEach(function(p){
+      var entry=index.byId[p.id];
+      if(entry&&entry.coach!==authorized.name)throw Error('Non puoi modificare o cancellare le serie di un altro allenatore.');
     });
     var athletes=roster_(ss);
     var tomb=ss.getSheetByName('_BiathlonDeleted');
@@ -217,38 +325,40 @@ function doPost(e){
     tombRows.forEach(function(row){
       deleted[String(row[0])]=true;
     });
-    rows.forEach(function(row,index){
-      var rid=String(row[0]);
-      if(rid){
-        existing[rid+'_'+row[7]]=index+2;
-        if(String(row[14]).toUpperCase()==='TRUE')deleted[rid]=true;
-      }
+    Object.keys(index.byId).forEach(function(rid){
+      if(index.byId[rid].deleted)deleted[rid]=true;
     });
     var newTombs=[];
     deletes.forEach(function(value){
       if(!deleted[value])newTombs.push([value,new Date().toISOString()]);
-      deleted[value]=true;
     });
     // Persist tombstones first. A late/retried insert cannot resurrect a deleted series.
     writeRows_(tomb,tomb.getLastRow()+1,newTombs,2);
     SpreadsheetApp.flush();
-    var deleteSet=Object.create(null);
+    var ranges=[],stale=false,flagged=Object.create(null);
     deletes.forEach(function(value){
-      deleteSet[value]=true;
-    });
-    var ranges=[];
-    rows.forEach(function(row,index){
-      if(deleteSet[String(row[0])])ranges.push('O'+(index+2));
+      var entry=index.byId[value];
+      // Already flagged series need no write: the request is idempotent
+      if(!entry||entry.deleted||flagged[value])return;
+      var found=seriesRows_(sheet,entry);
+      if(found.stale)stale=true;
+      found.rows.forEach(function(row){ranges.push('O'+row);});
+      if(!stale)index.sheet.getRange(entry.indexRow,5).setValue('TRUE');
+      flagged[value]=true;
     });
     if(ranges.length)sheet.getRangeList(ranges).setValue('TRUE');
+    deletes.forEach(function(value){
+      deleted[value]=true;
+    });
     var byId=Object.create(null),byName=Object.create(null);
     athletes.roster.forEach(function(a){
       byId[a.id]=a;
       byName[a.name.toLowerCase()]=a;
     });
-    var newAthletes=[],toInsert=[];
+    var newAthletes=[],toInsert=[],newEntries=[],start=index.lastRow+1;
     packets.forEach(function(p){
-      if(deleted[p.id])return;
+      // All shots of a series are written together, so a known ID is already complete
+      if(deleted[p.id]||index.byId[p.id])return;
       var a=byId[p.athleteId]||byName[p.athlete.toLowerCase()];
       if(!a){
         a={
@@ -258,15 +368,20 @@ function doPost(e){
         byId[a.id]=a;
         byName[a.name.toLowerCase()]=a;
       }
+      newEntries.push([p.id,cell_(p.coach),start+toInsert.length,p.shots.length,'FALSE']);
       p.shots.forEach(function(s){
-        var key=p.id+'_'+s.seq;
-        if(existing[key])return;
         toInsert.push([p.id,p.localDate,cell_(p.type),cell_(p.coach),cell_(p.athlete),p.position,p.series,s.seq,s.x,s.y,s.distanza,s.esito,p.windDir,p.windInt,'FALSE',a.id,p.sessionId,p.timestamp]);
-        existing[key]=true;
       });
+      index.byId[p.id]={id:p.id,coach:p.coach};
     });
     writeRows_(athletes.sheet,athletes.sheet.getLastRow()+1,newAthletes,4);
-    writeRows_(sheet,lastDataRow_(sheet)+1,toInsert,18);
+    writeRows_(sheet,start,toInsert,18);
+    // Index rows before the state property: a crash in between only causes a rebuild
+    if(stale)rebuildIndex_(ss,sheet,sheetName);
+    else if(toInsert.length){
+      writeRows_(index.sheet,index.nextRow,newEntries,5);
+      PropertiesService.getScriptProperties().setProperty(BIATHLON_INDEX_STATE,JSON.stringify({sheet:sheetName,lastRow:start+toInsert.length-1}));
+    }
     SpreadsheetApp.flush();
     return json_({
       status:'success',protocolVersion:2,coach:authorized.name,ack:{
@@ -305,7 +420,7 @@ function doGet(e){
   }
 }
 function onOpen(){
-  SpreadsheetApp.getUi().createMenu('Biathlon').addItem('Apri gestione allenatori','configuraBiathlon').addItem('Scegli indirizzo del servizio','scegliServizioBiathlon').addToUi();
+  SpreadsheetApp.getUi().createMenu('Biathlon').addItem('Apri gestione allenatori','configuraBiathlon').addItem('Scegli indirizzo del servizio','scegliServizioBiathlon').addItem('Ricostruisci indice serie','ricostruisciIndiceBiathlon').addToUi();
 }
 function normalizeServiceUrl_(value){
   var url=String(value||'').trim();

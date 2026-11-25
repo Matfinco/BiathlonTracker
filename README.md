@@ -19,6 +19,17 @@ Aprire almeno una volta l’app con connessione e attendere nel Menu la conferma
 
 All’apertura l’app controlla gli aggiornamenti e attiva automaticamente una nuova versione pronta prima di rendere disponibili i comandi. Il controllo iniziale dura al massimo circa tre secondi; se l’aggiornamento termina più tardi, resta disponibile nel Menu e non interrompe il lavoro. In assenza di rete viene usata la versione già installata. Prima della riapertura vengono attese le scritture locali; un collegamento personale ancora da confermare viene conservato temporaneamente per riproporlo dopo l’aggiornamento. Per installare questa nuova gestione su una vecchia versione può servire un ultimo aggiornamento manuale.
 
+## Statistiche
+
+**Menu → Statistiche e bersagli** apre `stats.html`, pensata in orizzontale per tablet e computer. Mostra i colpi sui bersagli Terra e Piedi, la percentuale, il punto medio (disco giallo con croce, scarto in mm) e la percentuale per numero di colpo.
+
+- Filtri: periodo, giornata, atleti, allenatori, tipo di allenamento, numero serie, numero colpo, esito e vento.
+- Colori per esito, atleta, numero serie o vento.
+- Tocco su un colpo: dettaglio della serie, colpi numerati e opzione per mostrare solo quella serie.
+- Confronto tra due periodi: A (cerchi blu) e B (quadrati arancioni), con percentuali e punti medi separati.
+
+I dati sono quelli di tutti gli allenatori: con un accesso valido la pagina scarica dal foglio solo le righe nuove e le conserva in `BiathlonArchiveDB`, quindi funziona anche offline. Le serie del dispositivo non ancora inviate sono incluse. Se il tab dei colpi viene riordinato a mano il download riparte da capo automaticamente.
+
 ## Pubblicazione e accesso degli allenatori
 
 L’indirizzo del deployment, le firme e le chiavi **non sono inclusi nel codice pubblico**. Si configurano manualmente su ciascun dispositivo.

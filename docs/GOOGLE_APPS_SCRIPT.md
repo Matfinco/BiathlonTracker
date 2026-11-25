@@ -17,6 +17,8 @@ Lo script apre esplicitamente il file configurato. Nelle richieste alla web app 
 
 Le colonne **A–O di Database conservano ordine e intestazioni esistenti**. Il nuovo codice aggiunge P `AtletaID`, Q `SessioneID`, R `Timestamp`; Anagrafica conserva A nome, B email, C note e aggiunge D `AtletaID`. Viene creato il foglio nascosto `_BiathlonDeleted`, che conserva gli identificativi eliminati e impedisce reinserimenti da richieste ritardate. Non cancellarlo durante la manutenzione ordinaria.
 
+Viene creato anche il foglio nascosto `_BiathlonIndex`, con una riga per serie. Gli invii leggono l’indice invece di tutti i colpi, così restano veloci anche con molte stagioni nello stesso foglio. L’indice si ricostruisce da solo se il tab dei colpi cambia lunghezza o se viene cancellato; un ordinamento manuale del tab è gestito durante le cancellazioni. Dopo modifiche manuali estese al tab dei colpi usare **Biathlon → Ricostruisci indice serie**: la richiesta successiva lo ricostruisce.
+
 Il codice non sostituisce le email esistenti. Per gli atleti nuovi conserva il comportamento precedente con email segnaposto; completare l’anagrafica se le regole di Looker dipendono da quella colonna. Le autorizzazioni del report Looker rimangono quelle configurate nel report.
 
 ## 2. Gestire gli allenatori dall’app
