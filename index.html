@@ -212,9 +212,6 @@
     <a class="button-link" href="stats.html">
      Statistiche e bersagli
     </a>
-    <button id="dashboard-open">
-     Statistiche online (Looker)
-    </button>
     <button aria-pressed="false" id="wake-button">
      Mantieni schermo acceso
     </button>
@@ -269,8 +266,6 @@
        Bianco e nero ad alto contrasto
       </option>
      </select>
-     <label for="looker-url">Indirizzo statistiche Looker Studio</label>
-     <input id="looker-url" inputmode="url" type="url"/>
      <button type="submit">
       Salva impostazioni
      </button>
@@ -456,9 +451,9 @@
    <div class="dialog-content">
     <p id="admin-status" role="status" aria-live="polite"></p>
     <section id="admin-login">
-     <p>Apri il collegamento amministratore sul tuo dispositivo, oppure incollalo qui.</p>
+     <p>La gestione è disponibile per gli allenatori amministratori. Se nessun amministratore è attivo, incolla qui il collegamento di recupero generato dal progetto Google.</p>
      <form id="admin-login-form">
-      <label for="admin-link">Collegamento amministratore</label>
+      <label for="admin-link">Collegamento di recupero</label>
       <input id="admin-link" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required=""/>
       <button type="submit">Abilita gestione</button>
      </form>
@@ -471,7 +466,7 @@
      </form>
      <div class="admin-toolbar">
       <button class="secondary" id="admin-refresh">Aggiorna elenco</button>
-      <button class="text-button" id="admin-logout">Disattiva gestione su questo dispositivo</button>
+      <button class="text-button" hidden="" id="admin-logout">Rimuovi il collegamento di recupero da questo dispositivo</button>
      </div>
      <ul class="coach-list" id="admin-coaches"></ul>
     </section>

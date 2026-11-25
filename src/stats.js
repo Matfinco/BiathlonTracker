@@ -12,10 +12,11 @@
   let local=null,archive=new Map(),cursor={cursor:1,cursorId:'',tombCursor:1,updatedAt:null};
   let all=[],options={athletes:[],coaches:[],types:[],seqs:[]},selected=null,focus=false,downloading=false,frame=0;
   const excluded={athletes:new Set(),coaches:new Set(),types:new Set(),seqs:new Set()};
-  const view={from:'',to:'',fromB:'',toB:'',compare:false,number:0,esito:'all',windMin:0,windMax:5,color:'esito'};
+  const view={from:'',to:'',fromB:'',toB:'',compare:false,number:0,esito:'all',windMin:0,windMax:5,color:'esito',mpi:true};
   try{
     const saved=localStorage.getItem('biathlon-stats-color');
     if(['esito','athlete','series','wind'].includes(saved))view.color=saved;
+    view.mpi=localStorage.getItem('biathlon-stats-mpi')!=='off';
   }catch(error){}
 
   function node(tag,text,cls){
@@ -27,6 +28,10 @@
   function status(text,error=false){
     $('data-status').textContent=text;
     $('data-status').classList.toggle('error',error);
+    // Restart the highlight so a repeated message is still noticed
+    $('data-status').classList.remove('pulse');
+    void $('data-status').offsetWidth;
+    $('data-status').classList.add('pulse');
   }
   function pct(value){
     return value==null?'–':`${value.toFixed(1).replace('.',',')}%`;
@@ -86,15 +91,21 @@
     if(pending)text+=` · ${pending} solo su questo dispositivo`;
     return text;
   }
+  // Coach access first, otherwise the administrator access of this device
+  function credentials(m){
+    if(m?.cloudUrl&&m?.apiToken)return {cloudUrl:m.cloudUrl,apiToken:m.apiToken,coachName:m.coachName};
+    if(m?.adminUrl&&m?.adminToken)return {cloudUrl:m.adminUrl,apiToken:m.adminToken,coachName:''};
+    return null;
+  }
   async function download(){
     if(downloading)return;
-    const m=local?.meta;
-    if(!m?.cloudUrl||!m?.apiToken){
-      status(`${dataStatus()} · solo dati di questo dispositivo: attiva il tuo accesso per l’archivio di tutti gli allenatori`);
+    const config=credentials(local?.meta);
+    if(!config){
+      status('Download bloccato: su questo dispositivo non è attivo un accesso verificato. Nell’app apri Menu → Impostazioni e atleti → Accesso e sincronizzazione e incolla il tuo collegamento personale.',true);
       return;
     }
     if(!navigator.onLine){
-      status(`${dataStatus()} · senza connessione`);
+      status(`${dataStatus()} · senza connessione: riprova quando torna la rete`,true);
       return;
     }
     downloading=true;
@@ -102,7 +113,7 @@
     try{
       for(let page=0;page<200;page++){
         status(`Scaricamento archivio… ${archive.size} serie`);
-        const r=await sync.request(m,{action:'archive',cursor:cursor.cursor,cursorId:cursor.cursorId,tombCursor:cursor.tombCursor,inserts:[],deletes:[]});
+        const r=await sync.request(config,{action:'archive',cursor:cursor.cursor,cursorId:cursor.cursorId,tombCursor:cursor.tombCursor,inserts:[],deletes:[]});
         if(!Array.isArray(r.rows)||!Number.isInteger(r.cursor))throw Error('Aggiorna il codice Google Apps Script per scaricare l’archivio delle statistiche.');
         const diff=S.applyArchivePage(archive,r);
         // Each page is saved with its cursor: an interrupted download resumes from there
@@ -200,6 +211,7 @@
     $('date-from-b').value=view.fromB;
     $('date-to-b').value=view.toB;
     $('compare-toggle').checked=view.compare;
+    $('mpi-toggle').checked=view.mpi;
     $('compare-fields').hidden=!view.compare;
     for(const b of $('color-mode').children){
       b.setAttribute('aria-pressed',String(b.dataset.mode===view.color));
@@ -307,47 +319,44 @@
         c.fillText(String(s.seq),s.x,s.y+.5/k);
       }
     }
-    // Mean point of impact: yellow disc with black ring and long cross, unlike any shot
+    // Mean point of impact: thin translucent cross and ring, so shots underneath stay visible
     for(const m of mpis){
       if(!m.point)continue;
-      const {x,y}=m.point,arm=24/k;
-      c.strokeStyle='#000';
-      c.lineWidth=5/k;
+      const {x,y}=m.point,arm=16/k;
+      c.globalAlpha=.75;
+      c.lineCap='round';
+      for(const [color,width] of [['#000',3.5/k],[MPI,1.6/k]]){
+        c.strokeStyle=color;
+        c.lineWidth=width;
+        c.beginPath();
+        c.moveTo(x-arm,y);c.lineTo(x-4/k,y);
+        c.moveTo(x+4/k,y);c.lineTo(x+arm,y);
+        c.moveTo(x,y-arm);c.lineTo(x,y-4/k);
+        c.moveTo(x,y+4/k);c.lineTo(x,y+arm);
+        c.stroke();
+      }
       c.beginPath();
-      c.moveTo(x-arm,y);c.lineTo(x+arm,y);
-      c.moveTo(x,y-arm);c.lineTo(x,y+arm);
-      c.stroke();
-      c.strokeStyle=MPI;
-      c.lineWidth=2/k;
-      c.stroke();
-      c.beginPath();
-      c.arc(x,y,11/k,0,Math.PI*2);
-      c.fillStyle=MPI;
+      c.arc(x,y,8/k,0,Math.PI*2);
+      c.fillStyle='rgba(255,212,0,.28)';
       c.fill();
-      c.strokeStyle='#000';
-      c.lineWidth=2.5/k;
-      c.stroke();
-      c.beginPath();
-      c.arc(x,y,15/k,0,Math.PI*2);
-      c.strokeStyle=m.ring||'#fff';
-      c.lineWidth=3.5/k;
+      c.strokeStyle=m.ring||MPI;
+      c.lineWidth=2/k;
       c.stroke();
       if(m.label){
         // Period letter beside the marker: A left, B right, readable when the two overlap
-        const side=m.label==='A'?-1:1,lx=x+side*30/k,ly=y-18/k;
+        const side=m.label==='A'?-1:1,lx=x+side*22/k,ly=y-14/k;
+        c.globalAlpha=.85;
         c.fillStyle=m.ring;
-        c.strokeStyle='#000';
-        c.lineWidth=2/k;
         c.beginPath();
-        c.arc(lx,ly,10/k,0,Math.PI*2);
+        c.arc(lx,ly,8/k,0,Math.PI*2);
         c.fill();
-        c.stroke();
         c.fillStyle='#000';
-        c.font=`800 ${13/k}px system-ui,sans-serif`;
+        c.font=`800 ${11/k}px system-ui,sans-serif`;
         c.textAlign='center';
         c.textBaseline='middle';
         c.fillText(m.label,lx,ly+.5/k);
       }
+      c.globalAlpha=1;
     }
     canvas._points=points;
   }
@@ -398,7 +407,7 @@
         :(S.offsetText(a.mpi)||'nessun colpo')));
       const groups=[{list:ownA,period:'a',shape:'circle'}];
       if(b)groups.push({list:ownB,period:'b',shape:'square'});
-      const mpis=b?[{point:a.mpi,label:'A',ring:PERIOD.a},{point:b.mpi,label:'B',ring:PERIOD.b}]:[{point:a.mpi}];
+      const mpis=!view.mpi?[]:b?[{point:a.mpi,label:'A',ring:PERIOD.a},{point:b.mpi,label:'B',ring:PERIOD.b}]:[{point:a.mpi}];
       draw(panel.querySelector('canvas'),groups,mpis);
       const legend=panel.querySelector('.legend');
       legend.replaceChildren(...legendFor(ownA.concat(ownB)).map(e=>{
@@ -406,11 +415,11 @@
         sw.style.background=e.color;
         li.append(sw,node('span',e.label));
         return li;
-      }),(()=>{
+      }),...(view.mpi?[(()=>{
         const li=node('li');
         li.append(node('span',undefined,'swatch mpi'),node('span','Punto medio'));
         return li;
-      })());
+      })()]:[]));
       renderBars(panel.querySelector('.bars'),a,b);
     }
     renderDetail();
@@ -487,6 +496,11 @@
       render();
     });
   }
+  $('mpi-toggle').addEventListener('change',e=>{
+    view.mpi=e.target.checked;
+    try{localStorage.setItem('biathlon-stats-mpi',view.mpi?'on':'off');}catch(error){}
+    render();
+  });
   $('compare-toggle').addEventListener('change',e=>{
     view.compare=e.target.checked;
     render();

@@ -105,6 +105,8 @@
           s.outbox=s.outbox.filter(o=>!confirmedOps.has(o.id));
           if(s.meta.syncLease?.owner===this.owner)s.meta.syncLease=null;
           s.meta.lastSync=new Date().toISOString();
+          // The server tells at every send whether this coach can manage accesses
+          if(typeof result.admin==='boolean')s.meta.coachAdmin=result.admin;
         });
         this.failures=0;
         this.onstate({

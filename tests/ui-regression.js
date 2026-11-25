@@ -152,6 +152,32 @@
       assert(element('access-status').textContent==='Coach');
     }finally{globalThis.fetch=oldFetch;navigator.onLine=false;}
   });
+  await test('A coach administrator opens management without the recovery link',async()=>{
+    const oldFetch=globalThis.fetch,endpoint='https://script.google.com/macros/s/test/exec',coachToken='personal-coach-test-token';
+    const s=__uiRepo.snapshot;
+    Object.assign(s.meta,{adminUrl:'',adminToken:'',coachName:'Coach',cloudUrl:endpoint,apiToken:coachToken,coachAdmin:false});
+    await __uiRepo.onchange();await flush();
+    let allowed=true;
+    globalThis.fetch=async(url,options)=>{
+      const request=JSON.parse(options.body);
+      assert(request.action==='admin.list'&&request.token===coachToken);
+      return {ok:true,json:async()=>allowed
+        ?{status:'success',protocolVersion:2,coaches:[{id:'coach-id',name:'Coach',active:true,admin:true,you:true,token:coachToken,keyHint:'st-token'}]}
+        :{status:'error',error:'Accesso amministratore non valido. Serve un allenatore amministratore.'}};
+    };
+    navigator.onLine=true;
+    try{
+      await element('admin-open').click();await flush();
+      assert(__uiRepo.snapshot.meta.coachAdmin===true);
+      assert(element('admin-panel').hidden===false);
+      assert(element('admin-logout').hidden===true);
+      allowed=false;
+      await element('admin-refresh').click();await flush();
+      assert(__uiRepo.snapshot.meta.coachAdmin===false);
+      assert(element('admin-panel').hidden===true);
+      assert(/non ha la gestione/.test(element('admin-status').textContent));
+    }finally{globalThis.fetch=oldFetch;navigator.onLine=false;}
+  });
   await test('UI records repeated taps at the same point',async()=>{
     await tap();
     await tap();

@@ -27,7 +27,8 @@ Il codice non sostituisce le email esistenti. Per gli atleti nuovi conserva il c
 2. Nell’app aprire **Menu → Gestisci allenatori**.
 3. Inserire nome e cognome e premere **Aggiungi allenatore**. L’app mostra il collegamento personale da copiare o condividere con l’allenatore.
 4. Nell’elenco sono visibili nome, stato e chiave associata. **Rigenera accesso** invalida il collegamento precedente; **Revoca accesso** blocca i successivi invii senza cancellare le serie conservate sui dispositivi.
-5. Per registrare le proprie serie, l’amministratore crea anche un accesso allenatore per sé e preme **Usa su questo dispositivo** nella propria scheda, poi conferma. I due accessi restano separati e possono coesistere sul dispositivo.
+5. Un amministratore è un allenatore con la gestione in più. Crea il tuo accesso allenatore, premi **Rendi amministratore** sulla tua scheda e poi **Usa su questo dispositivo**. Da quel momento il tuo collegamento personale basta per registrare, vedere le statistiche e gestire gli allenatori su qualsiasi dispositivo. Un amministratore può rendere amministratori altri allenatori o togliere loro la gestione, ma non può revocare o declassare se stesso.
+6. Il collegamento generato da `configuraBiathlon` resta come **collegamento di recupero**: serve solo se nessun amministratore è più disponibile. Conservalo in un posto sicuro.
 
 Le credenziali sono conservate nelle proprietà private del progetto Google. La vecchia proprietà `BIATHLON_COACH_KEYS`, se presente, viene migrata mantenendo le chiavi valide e l’associazione al nome. La creazione e la gestione degli allenatori non richiedono modifiche manuali alle proprietà né al codice.
 
@@ -53,7 +54,7 @@ In cima alle impostazioni compaiono nome e breve descrizione dell’accesso; seg
 
 Gli atleti mostrati all’apertura provengono dall’archivio locale del browser. Un browser nuovo, aperto dal solo link pubblico, non ha anagrafica né credenziali preconfigurate. L’anagrafica viene scaricata solo durante l’attivazione confermata di un accesso allenatore o tramite il comando esplicito **Scarica atleti da Google**. Le richieste senza credenziale vengono bloccate anche dal client; il server verifica autonomamente le credenziali per letture, inserimenti, cancellazioni e amministrazione. I nomi già salvati sul dispositivo restano disponibili offline.
 
-I presenti sono scelti in **Nuova sessione**; scaricare l’anagrafica non seleziona automaticamente tutti gli atleti. Il report Looker e le preferenze di visualizzazione si impostano nelle impostazioni.
+I presenti sono scelti in **Nuova sessione**; scaricare l’anagrafica non seleziona automaticamente tutti gli atleti. Le preferenze di visualizzazione si impostano nelle impostazioni.
 
 I collegamenti personali contengono la credenziale dopo `#`; all’apertura l’app rimuove il frammento dall’indirizzo e richiede conferma prima di salvare l’accesso. Le richieste al servizio Google inviano la credenziale nel corpo HTTPS. Il codice pubblico non contiene credenziali precompilate. Le serie salvate prima di configurare la firma vengono associate alla firma al momento dell’invio; quelle già firmate mantengono la propria attribuzione.
 

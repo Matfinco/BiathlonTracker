@@ -19,12 +19,12 @@ function authorize_(data){
   for(var i=0;i<records.length;i++){
     if(records[i].token===token){
       if(!records[i].active)throw Error('Accesso allenatore revocato. Chiedi un nuovo collegamento all’amministratore.');
-      return {name:records[i].name};
+      return {name:records[i].name,id:records[i].id,admin:records[i].admin===true};
     }
   }
   // Existing personal keys remain valid until the administrator migrates them.
   var raw=props.getProperty('BIATHLON_COACH_KEYS'),keys=raw?JSON.parse(raw):{};
-  if(Object.prototype.hasOwnProperty.call(keys,token)&&str_(keys[token],120))return {name:str_(keys[token],120)};
+  if(Object.prototype.hasOwnProperty.call(keys,token)&&str_(keys[token],120))return {name:str_(keys[token],120),id:'',admin:false};
   throw Error('Accesso allenatore non valido o revocato.');
 }
 var BIATHLON_COACH_PREFIX='BIATHLON_COACH_RECORD_';
@@ -55,27 +55,38 @@ function createCoach_(name){
   var now=new Date().toISOString();
   return storeCoach_({id:Utilities.getUuid(),name:name,token:Utilities.getUuid()+Utilities.getUuid(),active:true,createdAt:now,updatedAt:now});
 }
-function authorizeAdmin_(data){
+function isAdminToken_(data){
   var expected=PropertiesService.getScriptProperties().getProperty('BIATHLON_ADMIN_TOKEN');
-  if(!expected||String(data.token||'')!==expected)throw Error('Accesso amministratore non valido. Usa il collegamento amministratore generato dal progetto Google.');
+  return Boolean(expected)&&String(data.token||'')===expected;
+}
+// Management is allowed with the recovery key or with the key of a coach marked as administrator
+function adminActor_(data){
+  if(isAdminToken_(data))return {master:true,id:''};
+  var coach;
+  try{coach=authorize_(data);}catch(error){coach=null;}
+  if(!coach||!coach.admin)throw Error('Accesso amministratore non valido. Serve un allenatore amministratore o il collegamento di recupero del progetto Google.');
+  return {master:false,id:coach.id};
 }
 function adminAction_(data){
-  authorizeAdmin_(data);
-  if(['admin.list','admin.create','admin.rotate','admin.revoke'].indexOf(data.action)<0)throw Error('Operazione amministratore non valida.');
+  var actor=adminActor_(data);
+  if(['admin.list','admin.create','admin.rotate','admin.revoke','admin.promote','admin.demote'].indexOf(data.action)<0)throw Error('Operazione amministratore non valida.');
   migrateCoachKeys_();
   if(data.action==='admin.create')createCoach_(data.name);
-  if(data.action==='admin.rotate'||data.action==='admin.revoke'){
+  if(['admin.rotate','admin.revoke','admin.promote','admin.demote'].indexOf(data.action)>=0){
     var id=identifier_(data.id),record=coachRecords_().filter(function(r){return r.id===id;})[0];
     if(!record)throw Error('Allenatore non trovato. Aggiorna l’elenco.');
+    // An administrator cannot lock himself out from his own device
+    if(record.id===actor.id&&(data.action==='admin.revoke'||data.action==='admin.demote'))throw Error('Non puoi revocare il tuo accesso o toglierti la gestione: chiedilo a un altro amministratore.');
     if(data.action==='admin.rotate'){
       record.token=Utilities.getUuid()+Utilities.getUuid();
       record.active=true;
-    }else record.active=false;
+    }else if(data.action==='admin.revoke')record.active=false;
+    else record.admin=data.action==='admin.promote';
     record.updatedAt=new Date().toISOString();
     storeCoach_(record);
   }
   var coaches=coachRecords_().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(r){
-    return {id:r.id,name:r.name,active:r.active,createdAt:r.createdAt,updatedAt:r.updatedAt,keyHint:r.token.slice(-8),token:r.active?r.token:''};
+    return {id:r.id,name:r.name,active:r.active,admin:r.admin===true,you:r.id===actor.id,createdAt:r.createdAt,updatedAt:r.updatedAt,keyHint:r.token.slice(-8),token:r.active?r.token:''};
   });
   return json_({status:'success',protocolVersion:2,coaches:coaches});
 }
@@ -207,7 +218,7 @@ function archive_(ss,authorized,data){
   if(!Number.isInteger(tombCursor)||tombCursor<1||tombCursor>tombLast||reset||cursor===1)tombCursor=1;
   if(tomb&&tombLast>tombCursor)tombstones=tomb.getRange(tombCursor+1,1,tombLast-tombCursor,1).getValues().map(function(r){return String(r[0]);}).filter(String);
   return json_({
-    status:'success',protocolVersion:2,coach:authorized.name,reset:reset,rows:rows,
+    status:'success',protocolVersion:2,coach:authorized.name,admin:authorized.admin===true,reset:reset,rows:rows,
     cursor:end,cursorId:end>1?String(sheet.getRange(end,1).getValue()):'',done:end>=last,
     tombstones:tombstones,tombCursor:Math.max(1,tombLast)
   });
@@ -286,6 +297,8 @@ function doPost(e){
     lock=LockService.getScriptLock();
     if(!lock.tryLock(15000))throw Error('Archivio occupato. Riprova: le operazioni sono conservate sul dispositivo.');
     if(typeof data.action==='string'&&data.action.indexOf('admin.')===0)return adminAction_(data);
+    // Statistics are readable with any verified access: coach key or administrator key
+    if(data.action==='archive'&&isAdminToken_(data))return archive_(spreadsheet_(),{name:''},data);
     var authorized=authorize_(data);
     var input=data.inserts||[],deletes=data.deletes||[];
     if(!Array.isArray(input)||input.length>100||!Array.isArray(deletes)||deletes.length>500)throw Error('Troppe operazioni nella richiesta.');
@@ -299,13 +312,13 @@ function doPost(e){
     });
     var ss=spreadsheet_();
     if(data.action==='connection')return json_({
-      status:'success',protocolVersion:2,coach:authorized.name,databaseSheet:databaseSheetName_(ss)
+      status:'success',protocolVersion:2,coach:authorized.name,admin:authorized.admin,databaseSheet:databaseSheetName_(ss)
     });
     if(data.action==='roster'){
       var listed=roster_(ss);
       SpreadsheetApp.flush();
       return json_({
-        status:'success',protocolVersion:2,coach:authorized.name,roster:listed.roster
+        status:'success',protocolVersion:2,coach:authorized.name,admin:authorized.admin,roster:listed.roster
       });
     }
     if(data.action==='archive')return archive_(ss,authorized,data);
@@ -384,7 +397,7 @@ function doPost(e){
     }
     SpreadsheetApp.flush();
     return json_({
-      status:'success',protocolVersion:2,coach:authorized.name,ack:{
+      status:'success',protocolVersion:2,coach:authorized.name,admin:authorized.admin,ack:{
         inserts:packets.map(function(p){
           return p.id;
         }),deletes:deletes

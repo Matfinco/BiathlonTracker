@@ -81,7 +81,7 @@
     const sessionId = uid(), startedAt = new Date().toISOString();
     return {
       meta: {
-        schemaVersion: VERSION, revision: 0, coachName: '', cloudUrl: '', lookerUrl: '', apiToken: '', adminUrl: '', adminToken: '', theme: 'day', shotColor: 'color', shotLimit: 5, roster: [], activeIds: [], currentAthleteId: '', currentPos: 'T', currentMode: 'Azzeramento', currentWind: {
+        schemaVersion: VERSION, revision: 0, coachName: '', cloudUrl: '', lookerUrl: '', apiToken: '', adminUrl: '', adminToken: '', coachAdmin: false, theme: 'day', shotColor: 'color', shotLimit: 5, roster: [], activeIds: [], currentAthleteId: '', currentPos: 'T', currentMode: 'Azzeramento', currentWind: {
           dir:'C',int:0
         }, sessionId, lastActivity: Date.now(), counters: {
         }, drafts: {

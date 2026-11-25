@@ -789,6 +789,31 @@
     equal(Object.fromEntries(Object.entries(sheets).map(([k,v])=>[k,v.grid])),before);
   });
   const admin=(action,extra={})=>post({token:'admin-test-token-that-is-private',action,...extra});
+  await test('A coach marked as administrator manages accesses with his own key',()=>{
+    server();
+    const boss=admin('admin.create',{name:'Boss'}).coaches.find(c=>c.name==='Boss');
+    admin('admin.create',{name:'Helper'});
+    // Before promotion the coach key cannot manage
+    equal(post({token:boss.token,action:'admin.list'}).status,'error');
+    equal(admin('admin.promote',{id:boss.id}).coaches.find(c=>c.id===boss.id).admin,true);
+    const list=post({token:boss.token,action:'admin.list'});
+    equal(list.status,'success');
+    equal(list.coaches.find(c=>c.you).id,boss.id);
+    // Every coach response tells whether management is available
+    equal(post({token:boss.token,action:'roster'}).admin,true);
+    const helper=list.coaches.find(c=>c.name==='Helper');
+    equal(post({token:helper.token,action:'roster'}).admin,false);
+    equal(post({token:helper.token,action:'admin.list'}).status,'error');
+    // Promote and demote others, never lock yourself out
+    equal(post({token:boss.token,action:'admin.promote',id:helper.id}).coaches.find(c=>c.id===helper.id).admin,true);
+    equal(post({token:boss.token,action:'admin.demote',id:helper.id}).coaches.find(c=>c.id===helper.id).admin,false);
+    equal(post({token:boss.token,action:'admin.demote',id:boss.id}).status,'error');
+    equal(post({token:boss.token,action:'admin.revoke',id:boss.id}).status,'error');
+    // Recovery key still works; a revoked administrator loses everything
+    admin('admin.revoke',{id:boss.id});
+    equal(post({token:boss.token,action:'admin.list'}).status,'error');
+    equal(post({token:boss.token,action:'roster'}).status,'error');
+  });
   await test('Coach and unauthenticated requests cannot list or manage personal accesses',()=>{
     server();
     for(const action of ['admin.list','admin.create','admin.rotate','admin.revoke']){
@@ -1120,10 +1145,20 @@
     equal(s.shots[0],{seq:1,x:358,y:55,esito:'Errore'});
     equal(sheets.Database_Colpi.grid[0][9],'Y_Grafico');
   });
-  await test('Archive refuses requests without a valid coach key',()=>{
+  await test('Archive refuses requests without a valid coach or administrator key',()=>{
     server();
     post({inserts:[serverPacket()]});
     equal(doPost({postData:{contents:JSON.stringify({token:'wrong-token-value',action:'archive'})}}).status,'error');
+    equal(doPost({postData:{contents:JSON.stringify({action:'archive'})}}).status,'error');
+  });
+  await test('Archive is readable with the administrator key, which still cannot write series',()=>{
+    server();
+    const p=serverPacket();post({inserts:[p]});
+    const admin=properties.BIATHLON_ADMIN_TOKEN;
+    const r=doPost({postData:{contents:JSON.stringify({token:admin,action:'archive'})}});
+    equal(r.status,'success');equal(r.coach,'');equal(r.rows.length,1);
+    equal(doPost({postData:{contents:JSON.stringify({token:admin,inserts:[serverPacket()]})}}).status,'error');
+    equal(sheets.Database.getLastRow(),2);
   });
   function statSeries(over){
     return {id:over.id||'s'+Math.random(),date:'2026-11-20',type:'i3',coach:'Coach',athlete:'Anna',athleteId:'a1',position:'T',series:'1T',number:1,windDir:'C',windInt:0,shots:[],...over};

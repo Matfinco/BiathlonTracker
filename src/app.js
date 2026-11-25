@@ -308,10 +308,10 @@
   }
   function fillSettings(){
     const m=state.meta;
-    for(const [input,key]of [['coach-name','coachName'],['cloud-url','cloudUrl'],['looker-url','lookerUrl'],['api-token','apiToken'],['shot-limit','shotLimit'],['shot-color-select','shotColor']])$(input).value=m[key]??'';
+    for(const [input,key]of [['coach-name','coachName'],['cloud-url','cloudUrl'],['api-token','apiToken'],['shot-limit','shotLimit'],['shot-color-select','shotColor']])$(input).value=m[key]??'';
     const coach=Boolean(m.coachName&&m.cloudUrl&&m.apiToken);
-    $('access-status').textContent=coach?m.coachName:m.adminToken?'Amministratore':'Nessun allenatore';
-    $('access-help').textContent=coach?'Accesso allenatore configurato su questo dispositivo.':m.adminToken?'Per registrare, scegli il tuo nome in Gestisci allenatori → Usa su questo dispositivo.':'Attiva il tuo collegamento personale in Accesso e sincronizzazione.';
+    $('access-status').textContent=coach?(m.coachAdmin?`${m.coachName} · amministratore`:m.coachName):m.adminToken?'Amministratore':'Nessun allenatore';
+    $('access-help').textContent=coach?(m.coachAdmin?'Accesso allenatore con gestione degli allenatori.':'Accesso allenatore configurato su questo dispositivo.'):m.adminToken?'Per registrare, scegli il tuo nome in Gestisci allenatori → Usa su questo dispositivo.':'Attiva il tuo collegamento personale in Accesso e sincronizzazione.';
     $('connection-result').textContent='';
     renderRoster();
   }
@@ -325,23 +325,32 @@
     $('access-error').hidden=true;
     openDialog('access-dialog');
   }
+  // Recovery key from the Google project first, otherwise the key of this coach
   function adminConfig(){
-    return {cloudUrl:state.meta.adminUrl,apiToken:state.meta.adminToken};
+    const m=state.meta;
+    if(m.adminToken&&m.adminUrl)return {cloudUrl:m.adminUrl,apiToken:m.adminToken,master:true};
+    if(m.cloudUrl&&m.apiToken)return {cloudUrl:m.cloudUrl,apiToken:m.apiToken,master:false};
+    return null;
+  }
+  function adminEnabled(){
+    const config=adminConfig();
+    return Boolean(config&&(config.master||state.meta.coachAdmin));
   }
   function renderAdmin(){
-    const enabled=Boolean(state.meta.adminToken&&state.meta.adminUrl);
+    const enabled=adminEnabled();
     $('admin-login').hidden=enabled;
     $('admin-panel').hidden=!enabled;
+    $('admin-logout').hidden=!state.meta.adminToken;
     $('admin-create').disabled=adminBusy;
     $('admin-refresh').disabled=adminBusy;
     if(!enabled){$('admin-coaches').replaceChildren();return;}
     $('admin-coaches').replaceChildren(...(adminCoaches.length?adminCoaches.map(coach=>{
-      const li=node('li'),name=node('h3',coach.name),status=node('p',coach.active?'Accesso attivo':'Accesso revocato',{class:`coach-status${coach.active?'':' revoked'}`});
+      const li=node('li'),name=node('h3',`${coach.name}${coach.you?' (tu)':''}`),status=node('p',`${coach.active?'Accesso attivo':'Accesso revocato'}${coach.admin?' · amministratore':''}`,{class:`coach-status${coach.active?'':' revoked'}`});
       const key=node('p',`Chiave associata: …${coach.keyHint}`,{class:'coach-key'});
       const actions=node('div',undefined,{class:'coach-actions'});
       if(coach.active){
         const use=button('Usa su questo dispositivo',()=>{
-          const link=D.invitationLink({coachName:coach.name,apiToken:coach.token,cloudUrl:state.meta.adminUrl},location.href);
+          const link=D.invitationLink({coachName:coach.name,apiToken:coach.token,cloudUrl:adminConfig().cloudUrl},location.href);
           offerAccess(D.invitation(link));
         });
         use.dataset.action='use-access';
@@ -356,10 +365,18 @@
       }
       actions.append(button(coach.active?'Rigenera accesso':'Crea nuovo accesso',async()=>{
         if(!await confirmAction('Nuovo collegamento',`Generare un nuovo accesso per ${coach.name}? I collegamenti precedenti smetteranno di funzionare. Le serie già raccolte restano sui dispositivi.`,'Genera nuovo accesso'))return;
-        const result=await adminRequest('admin.rotate',{id:coach.id});
-        if(result){const updated=adminCoaches.find(c=>c.id===coach.id);if(updated)shareAccess(updated);}
+        const config=adminConfig(),result=await adminRequest('admin.rotate',{id:coach.id});
+        if(!result)return;
+        const updated=adminCoaches.find(c=>c.id===coach.id);
+        // Own key rotated with the coach access: keep this device working with the new key
+        if(updated?.you&&!config.master&&updated.token)await change(s=>{s.meta.apiToken=updated.token;});
+        if(updated)shareAccess(updated);
       }));
-      if(coach.active)actions.append(button('Revoca accesso',async()=>{
+      if(coach.active&&!coach.you)actions.append(button(coach.admin?'Togli gestione':'Rendi amministratore',async()=>{
+        const promote=!coach.admin;
+        if(await confirmAction(promote?'Rendi amministratore':'Togli gestione',promote?`${coach.name} potrà aggiungere, rigenerare e revocare gli accessi degli allenatori.`:`${coach.name} resterà allenatore ma non potrà più gestire gli accessi.`,promote?'Rendi amministratore':'Togli gestione'))await adminRequest(promote?'admin.promote':'admin.demote',{id:coach.id});
+      }));
+      if(coach.active&&!coach.you)actions.append(button('Revoca accesso',async()=>{
         if(await confirmAction('Revoca accesso',`Bloccare l’accesso di ${coach.name}? I prossimi invii saranno rifiutati. Le serie già salvate restano conservate.`,'Revoca'))await adminRequest('admin.revoke',{id:coach.id});
       },'text-button danger-text'));
       for(const b of actions.children)b.disabled=adminBusy;
@@ -375,17 +392,27 @@
     renderAdmin();
     const config=adminConfig();
     try{
+      if(!config)throw Error('Attiva prima il tuo accesso allenatore.');
       const data=await sync.request(config,{action,...extra});
-      if(state.meta.adminToken!==config.apiToken||state.meta.adminUrl!==config.cloudUrl)throw Error('L’accesso amministratore è cambiato. Riapri la gestione.');
+      const now=adminConfig();
+      if(!now||now.apiToken!==config.apiToken||now.cloudUrl!==config.cloudUrl)throw Error('L’accesso è cambiato. Riapri la gestione.');
       if(!Array.isArray(data.coaches))throw Error('Aggiorna il servizio Google per usare la gestione allenatori.');
       adminCoaches=data.coaches;
+      if(!config.master&&!state.meta.coachAdmin)await change(s=>{s.meta.coachAdmin=true;});
       $('admin-status').textContent=`${adminCoaches.length} allenatori · ${adminCoaches.filter(c=>c.active).length} accessi attivi`;
       return data;
-    }catch(error){$('admin-status').textContent=error.message;return null;}
+    }catch(error){
+      // A coach without management rights: remember it and offer the recovery link
+      if(config&&!config.master&&/amministratore non valido/i.test(error.message)){
+        if(state.meta.coachAdmin)await change(s=>{s.meta.coachAdmin=false;});
+        $('admin-status').textContent='Il tuo accesso non ha la gestione degli allenatori. Chiedi a un amministratore di abilitarla, oppure usa il collegamento di recupero del progetto Google.';
+      }else $('admin-status').textContent=error.message;
+      return null;
+    }
     finally{adminBusy=false;renderAdmin();}
   }
   function shareAccess(coach){
-    const link=D.invitationLink({coachName:coach.name,apiToken:coach.token,cloudUrl:state.meta.adminUrl},location.href);
+    const link=D.invitationLink({coachName:coach.name,apiToken:coach.token,cloudUrl:adminConfig().cloudUrl},location.href);
     $('share-title').textContent=`Accesso di ${coach.name}`;
     $('share-description').textContent='Invia questo collegamento all’allenatore. Lo apre, conferma l’attivazione e trova l’app già configurata.';
     $('share-link').value=link;
@@ -424,7 +451,7 @@
         else{
           if(s.meta.syncLease?.until>Date.now())throw Error('Attendi la fine della sincronizzazione e riprova.');
           if(s.outbox.length&&s.meta.cloudUrl&&s.meta.cloudUrl!==candidate.cloudUrl)throw Error('Sincronizza le serie pendenti prima di cambiare destinazione.');
-          Object.assign(s.meta,{coachName:data.coach,cloudUrl:candidate.cloudUrl,apiToken:candidate.apiToken});
+          Object.assign(s.meta,{coachName:data.coach,cloudUrl:candidate.cloudUrl,apiToken:candidate.apiToken,coachAdmin:data.admin===true});
           D.mergeRoster(s,roster);
         }
       });
@@ -438,7 +465,8 @@
   $('admin-open').addEventListener('click',()=>{
     openDialog('admin-dialog');renderAdmin();
     $('admin-status').textContent='';
-    if(state.meta.adminToken)adminRequest('admin.list');
+    // A coach discovers here whether an administrator granted management
+    if(adminConfig())adminRequest('admin.list');
   });
   $('admin-refresh').addEventListener('click',()=>adminRequest('admin.list'));
   $('admin-create-form').addEventListener('submit',async e=>{
@@ -470,7 +498,7 @@
   $('share-back').addEventListener('click',()=>{openDialog('admin-dialog');renderAdmin();});
   function settingsConfig(){
     return {
-      coachName:$('coach-name').value.trim(),cloudUrl:D.syncUrl($('cloud-url').value),lookerUrl:D.validUrl($('looker-url').value),apiToken:$('api-token').value.trim(),shotLimit:D.limit($('shot-limit').value),theme:'day',shotColor:$('shot-color-select').value
+      coachName:$('coach-name').value.trim(),cloudUrl:D.syncUrl($('cloud-url').value),apiToken:$('api-token').value.trim(),shotLimit:D.limit($('shot-limit').value),theme:'day',shotColor:$('shot-color-select').value
     };
   }
   $('connection-check').addEventListener('click',async()=>{
@@ -1038,16 +1066,6 @@
       showError(error);
     }
   });
-  $('dashboard-open').addEventListener('click',()=>{
-    try{
-      if(!navigator.onLine)throw Error('Le statistiche online richiedono connessione. Usa il riepilogo sul dispositivo.');
-      const url=D.validUrl(state.meta.lookerUrl);
-      if(!url)throw Error('Configura l’indirizzo delle statistiche nelle impostazioni.');
-      window.open(url,'_blank','noopener,noreferrer');
-    }catch(error){
-      showError(error);
-    }
-  });
   async function requestWake(){
     try{
       if(!('wakeLock'in navigator))throw Error('Questo browser non supporta il mantenimento dello schermo acceso.');
@@ -1076,7 +1094,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-13');
+        const cache=await caches.open('biathlon-field-v6-14');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();
@@ -1145,6 +1163,8 @@
       $('app').setAttribute('aria-busy','false');
       $('startup').hidden=true;
       if(!state.meta.roster.length)notify('Apri il menu per aggiungere gli atleti o scaricare l’anagrafica.');
+      // iOS Safari tab (not the Home Screen app): its data is erased after 7 days without visits
+      if(navigator.standalone===false)notify('Stai usando l’app in Safari: accessi e dati possono essere cancellati dopo 7 giorni senza utilizzo. Usa l’icona sulla schermata Home (Condividi → Aggiungi alla schermata Home) e attiva lì il tuo accesso.',true);
       if(receivedInvitation){
         if(receivedInvitation.error)showError(receivedInvitation.error);else offerAccess(receivedInvitation.value);
         receivedInvitation=null;

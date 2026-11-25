@@ -28,7 +28,9 @@ All’apertura l’app controlla gli aggiornamenti e attiva automaticamente una 
 - Tocco su un colpo: dettaglio della serie, colpi numerati e opzione per mostrare solo quella serie.
 - Confronto tra due periodi: A (cerchi blu) e B (quadrati arancioni), con percentuali e punti medi separati.
 
-I dati sono quelli di tutti gli allenatori: con un accesso valido la pagina scarica dal foglio solo le righe nuove e le conserva in `BiathlonArchiveDB`, quindi funziona anche offline. Le serie del dispositivo non ancora inviate sono incluse. Se il tab dei colpi viene riordinato a mano il download riparte da capo automaticamente.
+I dati sono quelli di tutti gli allenatori: con un accesso verificato (allenatore o amministratore) la pagina scarica dal foglio solo le righe nuove e le conserva in `BiathlonArchiveDB`, quindi funziona anche offline. Le serie del dispositivo non ancora inviate sono incluse. Se il tab dei colpi viene riordinato a mano il download riparte da capo automaticamente. Senza un accesso verificato il download è bloccato dal server.
+
+Su iPhone e iPad usare l’icona sulla schermata Home: Safari cancella dati e accessi dei siti non visitati da 7 giorni, e i collegamenti aperti da messaggi o email finiscono in Safari, non nell’app. Per attivare un accesso nell’app incollare il collegamento in **Impostazioni e atleti → Accesso e sincronizzazione**.
 
 ## Pubblicazione e accesso degli allenatori
 
