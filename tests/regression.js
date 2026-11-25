@@ -1101,6 +1101,25 @@
     equal(r.reset,true);
     equal(r.rows.length,2);
   });
+  await test('Archive reads existing rows: date cells, boolean flags and empty P-R columns',()=>{
+    server();
+    Utilities.formatDate=(d,tz,f)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    globalThis.Session={getScriptTimeZone:()=>'Europe/Rome'};
+    // Same shape as the production sheet, headers included
+    sheets.Database_Colpi=new Sheet('Database_Colpi',[
+      ['ID serie','Data','Tipo','Allenatore','Atleta','Posizione','Serie','N_Colpo','X','Y_Grafico','Distanza','Esito','Dir_Vento','Int_Vento','Eliminato','AtletaID','SessioneID','TimeStamp','EmailAtleta'],
+      ['1789195576501_vu46o',new Date(2026,8,12),'Azzeramento','Riccardo Finco','Angela Frigo','P','1P',1,358,55,228,'Errore','C',0,false],
+      ['1789195576501_vu46o',new Date(2026,8,12),'Azzeramento','Riccardo Finco','Angela Frigo','P','1P',2,174,187,42,'Bersaglio','C',0,false],
+      ['1790089445273_n7pjq',new Date(2026,8,22),'L2','Riccardo Finco','Angela Frigo','T','1T',1,241,117,111,'Errore','C',0,true]
+    ]);
+    delete sheets.Database;
+    const {map}=archiveAll();
+    equal(Array.from(map.keys()),['1789195576501_vu46o']);
+    const s=map.get('1789195576501_vu46o');
+    equal(s.date,'2026-09-12');equal(s.type,'Azzeramento');equal(s.shots.length,2);
+    equal(s.shots[0],{seq:1,x:358,y:55,esito:'Errore'});
+    equal(sheets.Database_Colpi.grid[0][9],'Y_Grafico');
+  });
   await test('Archive refuses requests without a valid coach key',()=>{
     server();
     post({inserts:[serverPacket()]});
@@ -1143,6 +1162,17 @@
     const merged=St.mergeSources([archived,deletedRemote],s);
     equal(merged.map(x=>x.id).sort(),['remote',local.id].sort());
     equal(merged.find(x=>x.id===local.id).source,'local');
+  });
+  await test('Statistics join old sheet rows without athlete ID to the same athlete',()=>{
+    const map=new Map();
+    // Old row: columns P-R empty, as in the existing sheet
+    St.applyArchivePage(map,{rows:[['old-1','2026-09-12','L2','Riccardo Finco','Angela Frigo','T','1T',1,200,220,'Bersaglio','C',0,false,'','','']]});
+    St.applyArchivePage(map,{rows:[['new-1','2026-11-20','i3','Coach','Angela Frigo','T','1T',1,210,220,'Bersaglio','C',0,false,'uuid-a','s','2026-11-20T10:00:00Z']]});
+    const merged=St.mergeSources(Array.from(map.values()),null);
+    equal(merged.map(s=>s.athleteId),['uuid-a','uuid-a']);
+    equal(St.athletes(merged),[{id:'uuid-a',name:'Angela Frigo'}]);
+    const onlyOld=St.mergeSources([map.get('old-1')],{meta:{roster:[{id:'roster-a',name:'Angela Frigo'}]},series:[],outbox:[]});
+    equal(onlyOld[0].athleteId,'roster-a');
   });
   await test('Statistics colour groups and quick periods',()=>{
     const shot={hit:true,seq:1,series:statSeries({number:3,windInt:4})};

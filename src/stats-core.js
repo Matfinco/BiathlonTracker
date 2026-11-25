@@ -68,6 +68,15 @@
         shots:r.shots.map(s=>({seq:s.seq,x:s.x,y:s.y,esito:s.esito})),source:'local'
       });
     }
+    // Old sheet rows have no athlete ID: reuse the ID of a series with the same name
+    const byName=new Map();
+    for(const a of state?.meta?.roster||[])byName.set(a.name.toLocaleLowerCase('it'),a.id);
+    for(const s of result.values())if(!String(s.athleteId).startsWith('name:'))byName.set(String(s.athlete).toLocaleLowerCase('it'),s.athleteId);
+    for(const s of result.values()){
+      if(!String(s.athleteId).startsWith('name:'))continue;
+      const id=byName.get(String(s.athlete).toLocaleLowerCase('it'));
+      if(id)s.athleteId=id;
+    }
     return Array.from(result.values());
   }
   // Same athlete registered with different IDs on old rows: group by name as fallback
