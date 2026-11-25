@@ -33,6 +33,9 @@
     void $('data-status').offsetWidth;
     $('data-status').classList.add('pulse');
   }
+  function missText(n){
+    return `${n} ${n===1?'errore':'errori'}`;
+  }
   function pct(value){
     return value==null?'–':`${value.toFixed(1).replace('.',',')}%`;
   }
@@ -403,7 +406,7 @@
       };
       track.append(bar(ga,b?'period-a':''));
       if(b)track.append(bar(gb,'period-b'));
-      const value=b?`${ga?Math.round(ga.pct):'–'} · ${gb?Math.round(gb.pct):'–'}%`:ga?`${Math.round(ga.pct)}% (${ga.hits}/${ga.n})`:'–';
+      const value=b?`${ga?Math.round(ga.pct):'–'} · ${gb?Math.round(gb.pct):'–'}%`:ga?`${Math.round(ga.pct)}% (${missText(ga.n-ga.hits)})`:'–';
       row.append(node('span',String(seq)),track,node('span',value,'bar-value'));
       return row;
     }));
@@ -420,8 +423,8 @@
         head.replaceChildren(node('small','A '),document.createTextNode(pct(a.pct)+' '),node('small','B '),document.createTextNode(pct(b.pct)));
       }else head.textContent=pct(a.pct);
       panel.querySelector('.panel-meta').textContent=b
-        ?`A: ${a.n} colpi, ${a.series} serie · B: ${b.n} colpi, ${b.series} serie`
-        :`${a.n} colpi · ${a.series} serie · ${a.hits} centri`;
+        ?`A: ${a.n} colpi, ${a.series} serie, ${missText(a.n-a.hits)} · B: ${b.n} colpi, ${b.series} serie, ${missText(b.n-b.hits)}`
+        :`${a.n} colpi · ${a.series} serie · ${missText(a.n-a.hits)}`;
       const mpiLine=panel.querySelector('.panel-mpi');
       mpiLine.replaceChildren(node('strong','Punto medio: '),document.createTextNode(b
         ?`A ${S.offsetText(a.mpi)||'–'} · B ${S.offsetText(b.mpi)||'–'}`
@@ -448,10 +451,10 @@
   function renderDetail(){
     $('detail').hidden=!selected;
     if(!selected)return;
-    const s=selected,hits=s.shots.filter(x=>x.esito==='Bersaglio').length;
+    const s=selected,misses=s.shots.filter(x=>x.esito!=='Bersaglio').length;
     $('detail-title').textContent=`${s.athlete} · Serie ${s.series} · ${s.type}`;
     const wind=Number(s.windInt)?`vento ${ARROWS[s.windDir]||''} ${s.windInt}/5`:'vento calmo';
-    $('detail-info').textContent=`${s.date?dayLabel(s.date):''} · ${s.position==='T'?'Terra':'Piedi'} · allenatore ${s.coach||'non indicato'} · ${wind} · ${hits}/${s.shots.length} centri${s.source==='local'?' · non ancora sincronizzata':''}`;
+    $('detail-info').textContent=`${s.date?dayLabel(s.date):''} · ${s.position==='T'?'Terra':'Piedi'} · allenatore ${s.coach||'non indicato'} · ${wind} · ${missText(misses)} su ${s.shots.length}${s.source==='local'?' · non ancora sincronizzata':''}`;
     $('detail-shots').replaceChildren(...s.shots.map(x=>node('li',`${x.seq} ${x.esito==='Bersaglio'?'✓':'×'}`,x.esito==='Bersaglio'?'hit':'miss')));
     $('detail-focus').setAttribute('aria-pressed',String(focus));
     $('detail-focus').textContent=focus?'Mostra tutti i colpi':'Mostra solo questa serie';

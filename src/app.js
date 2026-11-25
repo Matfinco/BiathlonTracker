@@ -204,8 +204,8 @@
     $('wind-open').replaceChildren(windFlag(displayedWind.int),node('span',windText(displayedWind)));
     $('wind-open').disabled=isReview||locked;
     $('shot-count').textContent=isReview?`${values.length} colpi`:`${values.length} / ${m.shotLimit} colpi`;
-    const hits=values.filter(s=>s.esito==='Bersaglio').length;
-    $('hit-count').textContent=`${hits} ${hits===1?'centro':'centri'}`;
+    // Biathlon counts misses, not hits
+    $('hit-count').textContent=missText(values.filter(s=>s.esito!=='Bersaglio').length);
     $('edit-button').hidden=isReview;
     const editLabel=editing?'Fine modifica':'Modifica colpi';
     if($('edit-button').textContent!==editLabel)$('edit-button').textContent=editLabel;
@@ -320,6 +320,9 @@
       if(fresh)openDialog('session-dialog');
       else await change(s=>D.touchSession(s));
     }finally{idleAsking=false;}
+  }
+  function missText(n){
+    return `${n} ${n===1?'errore':'errori'}`;
   }
   function fillSettings(){
     const m=state.meta;
@@ -586,7 +589,7 @@
       }),buttons=node('div',undefined,{
         class:'record-buttons'
       });
-      info.append(node('strong',`${r.athlete} · ${r.series} · ${r.type}`),node('small',`${new Date(r.timestamp).toLocaleString('it-IT')} · ${r.shots.filter(s=>s.esito==='Bersaglio').length}/${r.shots.length} centri`));
+      info.append(node('strong',`${r.athlete} · ${r.series} · ${r.type}`),node('small',`${new Date(r.timestamp).toLocaleString('it-IT')} · ${missText(r.shots.filter(s=>s.esito!=='Bersaglio').length)} su ${r.shots.length}`));
       buttons.append(button('Apri',()=>{
         review=r.id;
         editing=false;
@@ -654,7 +657,7 @@
       const card=node('article',undefined,{
         class:'summary-card'
       });
-      card.append(node('strong',g.name),node('p',`${g.position==='T'?'Terra':'Piedi'} · ${g.type}`),node('p',`${g.series} serie · ${g.hits}/${g.shots} centri · ${g.shots?Math.round(g.hits/g.shots*100):0}%`));
+      card.append(node('strong',g.name),node('p',`${g.position==='T'?'Terra':'Piedi'} · ${g.type}`),node('p',`${g.series} serie · ${missText(g.shots-g.hits)} su ${g.shots} · ${g.shots?Math.round(g.hits/g.shots*100):0}%`));
       return card;
     }));
     if(!groups.size)$('summary-list').append(node('p','Il riepilogo comparirà dopo la prima serie salvata.'));
@@ -1110,7 +1113,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-16');
+        const cache=await caches.open('biathlon-field-v6-17');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();

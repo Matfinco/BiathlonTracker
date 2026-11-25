@@ -256,14 +256,14 @@
     assert(element('shot-count').textContent==='2 / 5 colpi');
     assert(element('series-button').textContent==='Serie 1');
     assert(!__uiRepo.snapshot.meta.drafts[originalKey]);
-    assert(element('hit-count').textContent==='1 centro');
+    assert(element('hit-count').textContent==='1 errore');
     await element('position-button').click();await flush();
     assert(element('position-button').textContent==='Piedi');
-    assert(element('hit-count').textContent==='2 centri');
+    assert(element('hit-count').textContent==='0 errori');
     element('mode-select').value='Azzeramento';await element('mode-select').emit('change');await flush();
     await element('position-button').click();await flush();
     assert(element('series-button').textContent==='Serie 2');
-    assert(element('hit-count').textContent==='1 centro');
+    assert(element('hit-count').textContent==='1 errore');
     assert(Object.values(__uiRepo.snapshot.meta.drafts).filter(d=>d.shots.length).length===1);
     await element('save-button').click();await flush();
     const saved=__uiRepo.snapshot.series.at(-1);
