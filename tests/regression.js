@@ -1145,6 +1145,21 @@
     equal(s.shots[0],{seq:1,x:358,y:55,esito:'Errore'});
     equal(sheets.Database_Colpi.grid[0][9],'Y_Grafico');
   });
+  await test('Server responses carry the protocol version, also on refusals',()=>{
+    server();
+    equal(post({action:'roster'}).serverVersion,3);
+    equal(post({token:'wrong-token-value',action:'archive'}).serverVersion,3);
+  });
+  await test('Refusals keep the server version so the app can detect an outdated deployment',async()=>{
+    const s=setup();
+    for(const [reply,version] of [[{status:'error',error:'Accesso allenatore non valido o revocato.'},0],[{status:'error',serverVersion:3,error:'x'},3]]){
+      const {engine}=engineFor(s,async()=>({ok:true,json:async()=>reply}));
+      let caught=null;
+      try{await engine.request({cloudUrl:'https://script.google.com/macros/s/test/exec',apiToken:'token-value-long-enough',coachName:'Coach'},{action:'archive'});}catch(error){caught=error;}
+      assert(caught&&caught.server===true);
+      equal(caught.serverVersion,version);
+    }
+  });
   await test('Archive refuses requests without a valid coach or administrator key',()=>{
     server();
     post({inserts:[serverPacket()]});

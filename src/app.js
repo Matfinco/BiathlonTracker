@@ -403,10 +403,11 @@
       return data;
     }catch(error){
       // A coach without management rights: remember it and offer the recovery link
-      if(config&&!config.master&&/amministratore non valido/i.test(error.message)){
+      if(config&&!config.master&&error.serverVersion>=3&&/amministratore non valido/i.test(error.message)){
         if(state.meta.coachAdmin)await change(s=>{s.meta.coachAdmin=false;});
         $('admin-status').textContent='Il tuo accesso non ha la gestione degli allenatori. Chiedi a un amministratore di abilitarla, oppure usa il collegamento di recupero del progetto Google.';
-      }else $('admin-status').textContent=error.message;
+      }else if(error.server&&error.serverVersion<3)$('admin-status').textContent='Il codice Google pubblicato è una versione precedente: in Apps Script crea una nuova versione del deployment (Gestisci deployment → Modifica → Nuova versione).';
+      else $('admin-status').textContent=error.message;
       return null;
     }
     finally{adminBusy=false;renderAdmin();}
@@ -1094,7 +1095,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-14');
+        const cache=await caches.open('biathlon-field-v6-15');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();

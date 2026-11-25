@@ -44,7 +44,13 @@
         }catch(error){
           throw Error('Risposta non valida. Verifica indirizzo /exec e deployment Apps Script.');
         }
-        if(data.status!=='success')throw Error(data.error||'Il server non ha confermato il salvataggio.');
+        if(data.status!=='success'){
+          // Keep the server version: a refusal from an old deployment needs a different hint
+          const refused=Error(data.error||'Il server non ha confermato il salvataggio.');
+          refused.server=true;
+          refused.serverVersion=Number(data.serverVersion)||0;
+          throw refused;
+        }
         if(data.protocolVersion!==2)throw Error('Aggiorna il codice Google Apps Script alla versione inclusa nel progetto. Le operazioni restano in coda.');
         if(payload.action!=='roster'&&data.coach&&data.coach!==config.coachName)throw Error('La conferma del server appartiene a un altro allenatore.');
         return data;

@@ -93,14 +93,30 @@
   }
   // Coach access first, otherwise the administrator access of this device
   function credentials(m){
-    if(m?.cloudUrl&&m?.apiToken)return {cloudUrl:m.cloudUrl,apiToken:m.apiToken,coachName:m.coachName};
-    if(m?.adminUrl&&m?.adminToken)return {cloudUrl:m.adminUrl,apiToken:m.adminToken,coachName:''};
-    return null;
+    const list=[];
+    if(m?.cloudUrl&&m?.apiToken)list.push({cloudUrl:m.cloudUrl,apiToken:m.apiToken,coachName:m.coachName});
+    if(m?.adminUrl&&m?.adminToken)list.push({cloudUrl:m.adminUrl,apiToken:m.adminToken,coachName:''});
+    return list;
+  }
+  const OUTDATED='Il codice Google pubblicato è una versione precedente. In Apps Script apri Esegui deployment → Gestisci deployment → Modifica (matita) → Versione: Nuova versione → Esegui deployment.';
+  // Try each verified access of this device: a rotated coach key falls back to the recovery key
+  async function requestArchive(list,payload){
+    let last;
+    for(const config of list){
+      try{
+        return await sync.request(config,payload);
+      }catch(error){
+        last=error;
+        if(!error.server)throw error;
+      }
+    }
+    if(last.server&&last.serverVersion<3)throw Error(OUTDATED);
+    throw last;
   }
   async function download(){
     if(downloading)return;
     const config=credentials(local?.meta);
-    if(!config){
+    if(!config.length){
       status('Download bloccato: su questo dispositivo non è attivo un accesso verificato. Nell’app apri Menu → Impostazioni e atleti → Accesso e sincronizzazione e incolla il tuo collegamento personale.',true);
       return;
     }
@@ -113,8 +129,8 @@
     try{
       for(let page=0;page<200;page++){
         status(`Scaricamento archivio… ${archive.size} serie`);
-        const r=await sync.request(config,{action:'archive',cursor:cursor.cursor,cursorId:cursor.cursorId,tombCursor:cursor.tombCursor,inserts:[],deletes:[]});
-        if(!Array.isArray(r.rows)||!Number.isInteger(r.cursor))throw Error('Aggiorna il codice Google Apps Script per scaricare l’archivio delle statistiche.');
+        const r=await requestArchive(config,{action:'archive',cursor:cursor.cursor,cursorId:cursor.cursorId,tombCursor:cursor.tombCursor,inserts:[],deletes:[]});
+        if(!Array.isArray(r.rows)||!Number.isInteger(r.cursor))throw Error(OUTDATED);
         const diff=S.applyArchivePage(archive,r);
         // Each page is saved with its cursor: an interrupted download resumes from there
         cursor={cursor:r.cursor,cursorId:r.cursorId,tombCursor:r.tombCursor,updatedAt:r.done?new Date().toISOString():cursor.updatedAt};

@@ -163,7 +163,7 @@
       assert(request.action==='admin.list'&&request.token===coachToken);
       return {ok:true,json:async()=>allowed
         ?{status:'success',protocolVersion:2,coaches:[{id:'coach-id',name:'Coach',active:true,admin:true,you:true,token:coachToken,keyHint:'st-token'}]}
-        :{status:'error',error:'Accesso amministratore non valido. Serve un allenatore amministratore.'}};
+        :{status:'error',serverVersion:3,error:'Accesso amministratore non valido. Serve un allenatore amministratore.'}};
     };
     navigator.onLine=true;
     try{

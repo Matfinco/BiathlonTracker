@@ -1,6 +1,9 @@
 /** Biathlon Tracker, protocol 2. A:O stay compatible with the existing Looker source. */
 var BIATHLON_HEADERS = ['ID','Data','Tipo','Allenatore','Atleta','Posizione','Serie','Colpo','X','Y','Distanza','Esito','VentoDir','VentoInt','Eliminato','AtletaID','SessioneID','Timestamp'];
+// Raised whenever the protocol gains features: the app detects an outdated deployment
+var BIATHLON_SERVER_VERSION=3;
 function json_(value){
+  if(value&&typeof value==='object')value.serverVersion=BIATHLON_SERVER_VERSION;
   return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);
 }
 function str_(value,max){
