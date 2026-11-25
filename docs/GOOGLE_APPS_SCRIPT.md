@@ -46,15 +46,15 @@ Riferimento ufficiale: [Web app Apps Script](https://developers.google.com/apps-
 
 ## 4. Configurare ciascun dispositivo
 
-L’allenatore apre il proprio collegamento e conferma **Attiva su questo dispositivo** con connessione disponibile. Nome, credenziale, destinazione e anagrafica vengono configurati insieme. In alternativa può incollare il collegamento in **Menu → Impostazioni e atleti → Accesso e sincronizzazione → Collegamento personale ricevuto**. La configurazione manuale resta disponibile nella stessa sezione richiudibile.
+L’allenatore apre il proprio collegamento e conferma **Attiva su questo dispositivo** con connessione disponibile. Nome, credenziale, destinazione e anagrafica vengono configurati insieme. In alternativa può incollare il collegamento in **Menu → Il mio accesso**. La configurazione manuale è nella sezione richiudibile **Configurazione manuale e verifica**.
 
-In cima alle impostazioni compaiono nome e breve descrizione dell’accesso; seguono atleti, preferenze e configurazione della sincronizzazione. Il campo del servizio accetta l’URL Apps Script `/exec`: il collegamento GitHub Pages apre l’app, mentre il collegamento al file Google Sheets apre il documento. Questi ultimi due non sono indirizzi di sincronizzazione.
+In cima a **Il mio accesso** compaiono nome e breve descrizione dell’accesso; gli atleti sono in **Menu → Atleti**, le preferenze in **Menu → Impostazioni**. Il campo del servizio accetta l’URL Apps Script `/exec`: il collegamento GitHub Pages apre l’app, mentre il collegamento al file Google Sheets apre il documento. Questi ultimi due non sono indirizzi di sincronizzazione.
 
-**Verifica accesso e destinazione Google** controlla credenziale e firma, e indica il tab che riceverà le serie. Non invia colpi né modifica il foglio. Dopo aver modificato manualmente i campi occorre comunque salvare le impostazioni.
+**Verifica accesso e destinazione Google** controlla credenziale e firma, e indica il tab che riceverà le serie. Non invia colpi né modifica il foglio. Dopo aver modificato manualmente i campi occorre premere **Salva accesso manuale**.
 
 Gli atleti mostrati all’apertura provengono dall’archivio locale del browser. Un browser nuovo, aperto dal solo link pubblico, non ha anagrafica né credenziali preconfigurate. L’anagrafica viene scaricata solo durante l’attivazione confermata di un accesso allenatore o tramite il comando esplicito **Scarica atleti da Google**. Le richieste senza credenziale vengono bloccate anche dal client; il server verifica autonomamente le credenziali per letture, inserimenti, cancellazioni e amministrazione. I nomi già salvati sul dispositivo restano disponibili offline.
 
-I presenti sono scelti in **Nuova sessione**; scaricare l’anagrafica non seleziona automaticamente tutti gli atleti. Le preferenze di visualizzazione si impostano nelle impostazioni.
+I presenti sono scelti in **Nuova sessione**; scaricare l’anagrafica non seleziona automaticamente tutti gli atleti. Le preferenze di visualizzazione sono in **Menu → Impostazioni**.
 
 I collegamenti personali contengono la credenziale dopo `#`; all’apertura l’app rimuove il frammento dall’indirizzo e richiede conferma prima di salvare l’accesso. Le richieste al servizio Google inviano la credenziale nel corpo HTTPS. Il codice pubblico non contiene credenziali precompilate. Le serie salvate prima di configurare la firma vengono associate alla firma al momento dell’invio; quelle già firmate mantengono la propria attribuzione.
 

@@ -41,7 +41,7 @@
   }
   async function settings(){
     await element('menu-open').click();
-    await document.querySelectorAll('[data-open]').find(b=>b.dataset.open==='settings-dialog').click();
+    await document.querySelectorAll('[data-open]').find(b=>b.dataset.open==='account-dialog').click();
   }
   await flush();
   assert(element('startup').hidden,'Application did not start');
@@ -117,6 +117,35 @@
       assert(element('connection-result').textContent.includes('Database_Colpi'));
       assert(!__uiRepo.snapshot.meta.apiToken,'Checking must not save credentials before confirmation');
     }finally{globalThis.fetch=oldFetch;navigator.onLine=false;}
+  });
+  await test('Preferences and manual access are saved separately and the menu shows the account',async()=>{
+    const m=__uiRepo.snapshot.meta;
+    Object.assign(m,{coachName:'',cloudUrl:'',apiToken:'',adminUrl:'',adminToken:'',coachAdmin:false});
+    await __uiRepo.onchange();await flush();
+    await element('menu-open').click();
+    assert(element('menu-account').textContent.startsWith('Nessun accesso'));
+    assert(element('admin-open').hidden);
+    // Preferences do not read or store access fields
+    await document.querySelectorAll('[data-open]').find(b=>b.dataset.open==='settings-dialog').click();
+    element('shot-limit').value='7';
+    await element('settings-form').emit('submit');await flush();
+    assert(__uiRepo.snapshot.meta.shotLimit===7&&!__uiRepo.snapshot.meta.apiToken);
+    element('settings-dialog').close();
+    // Manual access does not touch preferences
+    await settings();
+    element('coach-name').value='Coach Manuale';
+    element('cloud-url').value='https://script.google.com/macros/s/test/exec';
+    element('api-token').value='manual-personal-test-token';
+    element('shot-limit').value='3';
+    await element('manual-access-form').emit('submit');await flush();
+    assert(__uiRepo.snapshot.meta.apiToken==='manual-personal-test-token');
+    assert(__uiRepo.snapshot.meta.shotLimit===7);
+    element('account-dialog').close();
+    await element('menu-open').click();
+    assert(element('menu-account').textContent==='Coach Manuale');
+    element('menu-dialog').close();
+    Object.assign(__uiRepo.snapshot.meta,{coachName:'',cloudUrl:'',apiToken:'',shotLimit:5});
+    await __uiRepo.onchange();await flush();
   });
   await test('Administrator can activate a separate coach access on the same device',async()=>{
     const oldFetch=globalThis.fetch;
@@ -462,7 +491,7 @@
     assert(element('athlete-select').children[0].children.length===0);
   });
   await test('UI removing the active athlete selects a valid remaining athlete',async()=>{
-    await tap();await element('menu-open').click();await document.querySelectorAll('[data-open]').find(b=>b.dataset.open==='settings-dialog').click();const pending=element('roster-list').children[0].children[1].click();await flush();element('confirm-dialog').close('accept');await pending;await flush();assert(__uiRepo.snapshot.meta.currentAthleteId==='2');element('settings-dialog').close();await tap();await element('save-button').click();await flush();assert(__uiRepo.snapshot.series[0].athlete==='Atleta B');
+    await tap();await element('menu-open').click();await document.querySelectorAll('[data-open]').find(b=>b.dataset.open==='athletes-dialog').click();const pending=element('roster-list').children[0].children[1].click();await flush();element('confirm-dialog').close('accept');await pending;await flush();assert(__uiRepo.snapshot.meta.currentAthleteId==='2');element('athletes-dialog').close();await tap();await element('save-button').click();await flush();assert(__uiRepo.snapshot.series[0].athlete==='Atleta B');
   });
   await test('UI deleting the last saved series clears its history row',async()=>{
     await tap();await element('save-button').click();await flush();await element('history-open').click();const row=element('history-list').children[0],buttons=row.children[1];const pending=buttons.children[2].click();await flush();element('confirm-dialog').close('accept');await pending;await flush();assert(__uiRepo.snapshot.series.length===0);assert(element('history-list').children.length===1);assert(element('history-list').children[0].textContent==='Nessuna serie per questa selezione.');

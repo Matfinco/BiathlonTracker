@@ -121,7 +121,7 @@
      <span id="hit-count">
       0 errori
      </span>
-     <button aria-pressed="false" class="text-button" id="edit-button">
+     <button aria-pressed="false" class="edit-button" id="edit-button">
       Modifica colpi
      </button>
     </div>
@@ -194,35 +194,103 @@
     </button>
    </div>
    <div class="dialog-content menu-grid">
+    <button hidden="" id="update-button">
+     Aggiornamento disponibile
+    </button>
+    <h3 class="menu-group">Allenamento</h3>
     <button data-open="session-dialog">
      Nuova sessione
     </button>
-    <button data-open="settings-dialog">
-     Impostazioni e atleti
-    </button>
-    <button id="admin-open">
-     Gestisci allenatori
-    </button>
-    <button id="sync-now">
-     Sincronizza adesso
+    <button data-open="athletes-dialog">
+     Atleti
     </button>
     <button data-open="summary-dialog">
-     Riepilogo sul dispositivo
+     Riepilogo
     </button>
     <a class="button-link" href="stats.html">
      Statistiche e bersagli
     </a>
-    <button aria-pressed="false" id="wake-button">
-     Mantieni schermo acceso
-    </button>
-    <button hidden="" id="update-button">
-     Aggiornamento disponibile
+    <h3 class="menu-group">Account</h3>
+    <p class="menu-account" id="menu-account"></p>
+    <button id="sync-now">
+     Sincronizza adesso
     </button>
     <p class="helper" id="menu-sync-info">
     </p>
+    <button hidden="" id="admin-open">
+     Gestisci allenatori
+    </button>
+    <button data-open="account-dialog">
+     Il mio accesso
+    </button>
+    <h3 class="menu-group">Dispositivo</h3>
+    <button aria-pressed="false" id="wake-button">
+     Mantieni schermo acceso
+    </button>
+    <button data-open="settings-dialog">
+     Impostazioni
+    </button>
     <p class="helper" id="offline-ready">
      Preparazione dell’uso senza connessione…
     </p>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="athletes-title" id="athletes-dialog">
+   <div class="dialog-heading">
+    <h2 id="athletes-title">
+     Atleti
+    </h2>
+    <button aria-label="Chiudi atleti" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content">
+    <p class="helper">Elenco salvato su questo dispositivo, disponibile anche offline.</p>
+    <form class="add-athlete" id="athlete-form">
+     <label class="sr-only" for="new-athlete">Nome del nuovo atleta</label>
+     <input id="new-athlete" maxlength="120" placeholder="Nome e cognome" required="" type="text"/>
+     <button type="submit">Aggiungi</button>
+    </form>
+    <ul class="record-list" id="roster-list"></ul>
+    <button class="secondary" id="roster-download">Scarica atleti da Google</button>
+   </div>
+  </dialog>
+  <dialog aria-labelledby="account-title" id="account-dialog">
+   <div class="dialog-heading">
+    <h2 id="account-title">
+     Il mio accesso
+    </h2>
+    <button aria-label="Chiudi accesso" class="icon-button secondary" data-close="">
+     ×
+    </button>
+   </div>
+   <div class="dialog-content">
+    <section class="coach-identity" aria-labelledby="access-status">
+     <h3 id="access-status">Nessun allenatore</h3>
+     <p id="access-help" class="helper"></p>
+    </section>
+    <h3>Collegamento personale</h3>
+    <form id="access-form">
+     <label for="access-link">Incolla il collegamento ricevuto (anche quello di recupero)</label>
+     <input id="access-link" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui il collegamento" required=""/>
+     <button type="submit">Configura accesso</button>
+    </form>
+    <p class="helper">Il solo link pubblico dell’app non abilita letture o scritture su Google. Scaricare gli atleti richiede un accesso allenatore valido.</p>
+    <details class="manual-access" id="access-settings">
+     <summary>Configurazione manuale e verifica</summary>
+     <p class="helper">Usa il servizio Google che termina con /exec, insieme alla tua firma e alla chiave personale.</p>
+     <form id="manual-access-form">
+      <label for="coach-name">Firma allenatore</label>
+      <input autocomplete="name" id="coach-name" maxlength="120" type="text"/>
+      <label for="cloud-url">Indirizzo del servizio di sincronizzazione (/exec)</label>
+      <input id="cloud-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" type="url"/>
+      <label for="api-token">Chiave personale allenatore</label>
+      <input autocomplete="off" id="api-token" type="password"/>
+      <button type="submit" class="secondary">Salva accesso manuale</button>
+     </form>
+     <button type="button" class="secondary" id="connection-check">Verifica accesso e destinazione Google</button>
+     <p class="helper" id="connection-result" role="status" aria-live="polite"></p>
+    </details>
    </div>
   </dialog>
   <dialog aria-labelledby="settings-title" id="settings-dialog">
@@ -235,20 +303,6 @@
     </button>
    </div>
    <div class="dialog-content">
-    <section class="coach-identity" aria-labelledby="access-status">
-     <h3 id="access-status">Nessun allenatore</h3>
-     <p id="access-help" class="helper"></p>
-    </section>
-    <h3>Atleti</h3>
-    <p class="helper">Elenco salvato su questo dispositivo, disponibile anche offline.</p>
-    <form class="add-athlete" id="athlete-form">
-     <label class="sr-only" for="new-athlete">Nome del nuovo atleta</label>
-     <input id="new-athlete" maxlength="120" placeholder="Nome e cognome" required="" type="text"/>
-     <button type="submit">Aggiungi</button>
-    </form>
-    <ul class="record-list" id="roster-list"></ul>
-    <button class="secondary" id="roster-download">Scarica atleti da Google</button>
-    <hr/>
     <h3>Preferenze</h3>
     <form id="settings-form">
      <label for="shot-limit">
@@ -270,26 +324,6 @@
       Salva impostazioni
      </button>
     </form>
-    <details class="manual-access" id="access-settings">
-     <summary>Accesso e sincronizzazione</summary>
-     <form id="access-form">
-      <label for="access-link">Collegamento personale ricevuto</label>
-      <input id="access-link" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui il collegamento" required=""/>
-      <button type="submit">Configura accesso</button>
-     </form>
-     <p class="helper">Il solo link pubblico dell’app non abilita letture o scritture su Google. Scaricare gli atleti richiede un accesso allenatore valido.</p>
-     <h3>Configurazione manuale</h3>
-     <p class="helper">Usa il servizio Google che termina con /exec, insieme alla tua firma e alla chiave personale.</p>
-     <label for="coach-name">Firma allenatore</label>
-     <input form="settings-form" autocomplete="name" id="coach-name" maxlength="120" type="text"/>
-     <label for="cloud-url">Indirizzo del servizio di sincronizzazione (/exec)</label>
-     <input form="settings-form" id="cloud-url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" type="url"/>
-     <label for="api-token">Chiave personale allenatore</label>
-     <input form="settings-form" autocomplete="off" id="api-token" type="password"/>
-     <button form="settings-form" type="submit" class="secondary">Salva accesso manuale</button>
-     <button type="button" class="secondary" id="connection-check">Verifica accesso e destinazione Google</button>
-     <p class="helper" id="connection-result" role="status" aria-live="polite"></p>
-    </details>
     <hr/>
     <h3>
      Backup e recupero

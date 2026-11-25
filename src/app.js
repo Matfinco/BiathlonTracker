@@ -280,7 +280,8 @@
   function openDialog(id){
     if(busy||confirming)return;
     for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
-    if(id==='settings-dialog')fillSettings();
+    if(['settings-dialog','account-dialog','athletes-dialog'].includes(id))fillSettings();
+    if(id==='menu-dialog')renderMenu();
     if(id==='session-dialog')fillSession();
     if(id==='history-dialog')fillHistory();
     if(id==='summary-dialog')renderSummary();
@@ -323,6 +324,12 @@
   }
   function missText(n){
     return `${n} ${n===1?'errore':'errori'}`;
+  }
+  // Who is signed in and whether management is available, shown in the menu
+  function renderMenu(){
+    const m=state.meta,coach=Boolean(m.coachName&&m.cloudUrl&&m.apiToken);
+    $('menu-account').textContent=coach?(m.coachAdmin?`${m.coachName} · amministratore`:m.coachName):m.adminToken?'Collegamento di recupero attivo':'Nessun accesso: apri Il mio accesso';
+    $('admin-open').hidden=!adminEnabled();
   }
   function fillSettings(){
     const m=state.meta;
@@ -515,17 +522,15 @@
     catch(error){if(error.name!=='AbortError')showError(error);}
   });
   $('share-back').addEventListener('click',()=>{openDialog('admin-dialog');renderAdmin();});
-  function settingsConfig(){
-    return {
-      coachName:$('coach-name').value.trim(),cloudUrl:D.syncUrl($('cloud-url').value),apiToken:$('api-token').value.trim(),shotLimit:D.limit($('shot-limit').value),theme:'day',shotColor:$('shot-color-select').value
-    };
+  function accessConfig(){
+    return {coachName:$('coach-name').value.trim(),cloudUrl:D.syncUrl($('cloud-url').value),apiToken:$('api-token').value.trim()};
   }
   $('connection-check').addEventListener('click',async()=>{
     $('connection-check').disabled=true;
     $('connection-result').textContent='Verifica in corso…';
     try{
       if(!navigator.onLine)throw Error('Serve una connessione per verificare l’accesso a Google. I dati locali restano disponibili.');
-      const config=settingsConfig();
+      const config=accessConfig();
       if(!config.coachName)throw Error('Attiva il tuo accesso allenatore per verificare la destinazione delle serie.');
       const result=await sync.request(config,{action:'connection'});
       if(!result.databaseSheet)throw Error('Aggiorna il codice Google Apps Script alla versione attuale per verificare il foglio di destinazione.');
@@ -559,7 +564,7 @@
       label.append(input,node('span',a.name));
       return label;
     }));
-    if(!state.meta.roster.length)$('session-checklist').append(node('p','Aggiungi prima gli atleti nelle impostazioni.'));
+    if(!state.meta.roster.length)$('session-checklist').append(node('p','Aggiungi prima gli atleti da Menu → Atleti.'));
   }
   function fillHistory(){
     const sessions=[{
@@ -956,13 +961,22 @@
   $('settings-form').addEventListener('submit',async e=>{
     e.preventDefault();
     try{
-      const config=settingsConfig();
+      const prefs={shotLimit:D.limit($('shot-limit').value),theme:'day',shotColor:$('shot-color-select').value};
+      await change(s=>{Object.assign(s.meta,prefs);},'Impostazioni salvate sul dispositivo.');
+    }catch(error){
+      showError(error);
+    }
+  });
+  $('manual-access-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    try{
+      const config=accessConfig();
       if(state.outbox.length&&state.meta.cloudUrl&&config.cloudUrl!==state.meta.cloudUrl&&!await confirmAction('Cambia destinazione',`Ci sono ${state.outbox.length} operazioni pendenti. Inviarle al nuovo indirizzo configurato?`,'Cambia destinazione'))return;
       const done=await change(s=>{
         if(s.meta.syncLease?.until>Date.now()&&(config.cloudUrl!==s.meta.cloudUrl||config.apiToken!==s.meta.apiToken))throw Error('Attendi la fine della sincronizzazione prima di cambiare indirizzo o chiave.');
         Object.assign(s.meta,config);
-      },'Impostazioni salvate sul dispositivo.');
-      if(done)sync.schedule();
+      },'Accesso salvato sul dispositivo.');
+      if(done){fillSettings();sync.schedule();}
     }catch(error){
       showError(error);
     }
@@ -1113,7 +1127,7 @@
     try{
       if(await updates.start())return true;
       const checkReady=async()=>{
-        const cache=await caches.open('biathlon-field-v6-17');
+        const cache=await caches.open('biathlon-field-v6-18');
         $('offline-ready').textContent=await cache.match(new URL('index.html',location.href).href)?'App pronta per la riapertura senza connessione.':'Preparazione offline in corso. Attendi il completamento prima di disconnetterti.';
       };
       await checkReady();
@@ -1182,7 +1196,7 @@
       $('app').inert=false;
       $('app').setAttribute('aria-busy','false');
       $('startup').hidden=true;
-      if(!state.meta.roster.length)notify('Apri il menu per aggiungere gli atleti o scaricare l’anagrafica.');
+      if(!state.meta.roster.length)notify('Apri Menu → Atleti per aggiungerli o scaricarli da Google.');
       // iOS Safari tab (not the Home Screen app): its data is erased after 7 days without visits
       if(navigator.standalone===false)notify('Stai usando l’app in Safari: accessi e dati possono essere cancellati dopo 7 giorni senza utilizzo. Usa l’icona sulla schermata Home (Condividi → Aggiungi alla schermata Home) e attiva lì il tuo accesso.',true);
       if(receivedInvitation){

@@ -125,7 +125,7 @@
     if(downloading)return;
     const config=credentials(local?.meta);
     if(!config.length){
-      status('Download bloccato: su questo dispositivo non è attivo un accesso verificato. Nell’app apri Menu → Impostazioni e atleti → Accesso e sincronizzazione e incolla il tuo collegamento personale.',true);
+      status('Download bloccato: su questo dispositivo non è attivo un accesso verificato. Nell’app apri Menu → Il mio accesso e incolla il tuo collegamento personale.',true);
       return;
     }
     if(!navigator.onLine){

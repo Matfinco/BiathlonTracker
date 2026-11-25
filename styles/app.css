@@ -633,3 +633,10 @@ dialog::backdrop{
 #entry-actions,#review-actions{position:fixed;bottom:0;left:0;right:0;z-index:20;margin:0;padding:10px max(12px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:var(--bg);border-top:2px solid var(--line)}
 .text-button.danger-text{color:var(--danger)}
 .target-context .text-button{min-height:56px}
+.menu-group{margin:14px 0 -2px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.menu-group:first-of-type{margin-top:0}
+.menu-account{margin:0;font-weight:700}
+.menu-grid>.helper{margin:-4px 0 0}
+/* Edit shots: outlined button, filled while editing */
+.shot-summary .edit-button{min-height:44px;padding:8px 14px;background:var(--surface);color:var(--accent);border-color:var(--accent);font-size:.95rem}
+.shot-summary .edit-button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}

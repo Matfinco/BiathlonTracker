@@ -121,7 +121,7 @@
   }
   function addShot(state, x, y, expectedKey, expectedVersion) {
     const d = checkedDraft(state, expectedKey, expectedVersion);
-    if (d.shots.length >= state.meta.shotLimit) throw Error(`Raggiunto il limite di ${state.meta.shotLimit} colpi. Puoi aumentarlo nelle impostazioni.`);
+    if (d.shots.length >= state.meta.shotLimit) throw Error(`Raggiunto il limite di ${state.meta.shotLimit} colpi. Puoi aumentarlo in Menu → Impostazioni.`);
     d.shots.push(shot(x,y,d.position,d.shots.length+1));
     d.version++;
     state.meta.lastActivity = Date.now();

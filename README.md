@@ -9,7 +9,7 @@ App per smartphone e tablet per registrare i colpi al poligono, conservare le se
 - Se riapri l’app dopo più di 4 ore dall’ultimo colpo o salvataggio, chiede se continuare la sessione precedente o iniziarne una nuova (con gli atleti della volta scorsa già spuntati).
 - Se nella destinazione esiste già una vecchia serie incompleta, l’app propone di salvarla prima dello spostamento. Annullare lascia entrambe le serie come sono. Le correzioni dello storico sostituiscono l’originale soltanto quando vengono salvate, anche dopo un cambio di allenamento o posizione.
 - Tipi di allenamento: Azzeramento, Tiro da fermo, i1-i2, i3, i4, i5, Gara, Altro. Le serie e le bozze precedenti mantengono la categoria originale e restano modificabili; le nuove scelte usano le categorie aggiornate.
-- Cinque colpi iniziali; limite modificabile da **1 a 50** nelle impostazioni. Abbassarlo non elimina colpi già presenti.
+- Cinque colpi iniziali; limite modificabile da **1 a 50** in **Menu → Impostazioni**. Abbassarlo non elimina colpi già presenti.
 - Tocco per inserire, anche nello stesso punto di un colpo precedente. “Modifica colpi” permette di scegliere il numero e spostare il colpo, con vista ingrandita; “Annulla colpo” rimuove l’ultimo.
 - Salva e Annulla restano raggiungibili nella barra inferiore. Interfaccia chiara da esterno, marcatori colorati con forme diverse o bianco/nero, comandi di almeno 56 pixel per le operazioni principali.
 - Storico di tutte le sessioni, bozze da riprendere, riepilogo locale, backup JSON e ripristino. Aprire una correzione conserva la serie originale fino al nuovo salvataggio.
@@ -31,7 +31,7 @@ All’apertura l’app controlla gli aggiornamenti e attiva automaticamente una 
 
 I dati sono quelli di tutti gli allenatori: con un accesso verificato (allenatore o amministratore) la pagina scarica dal foglio solo le righe nuove e le conserva in `BiathlonArchiveDB`, quindi funziona anche offline. Le serie del dispositivo non ancora inviate sono incluse. Se il tab dei colpi viene riordinato a mano il download riparte da capo automaticamente. Senza un accesso verificato il download è bloccato dal server.
 
-Su iPhone e iPad usare l’icona sulla schermata Home: Safari cancella dati e accessi dei siti non visitati da 7 giorni, e i collegamenti aperti da messaggi o email finiscono in Safari, non nell’app. Per attivare un accesso nell’app incollare il collegamento in **Impostazioni e atleti → Accesso e sincronizzazione**.
+Su iPhone e iPad usare l’icona sulla schermata Home: Safari cancella dati e accessi dei siti non visitati da 7 giorni, e i collegamenti aperti da messaggi o email finiscono in Safari, non nell’app. Per attivare un accesso nell’app incollare il collegamento in **Menu → Il mio accesso**.
 
 ## Pubblicazione e accesso degli allenatori
 
@@ -43,7 +43,7 @@ Nel progetto Google eseguire `configuraBiathlon` dopo aver aggiornato il deploym
 
 Ogni allenatore riceve una chiave personale associata alla propria firma. Lo script rifiuta chiavi assenti o revocate, firme diverse da quella autorizzata e cancellazioni di serie di altri allenatori. L’app può raccogliere bozze offline; soltanto credenziali valide consentono lettura dell’anagrafica e scrittura sul foglio.
 
-Le impostazioni mostrano il nome dell’allenatore, gli atleti e poi le preferenze; accesso e sincronizzazione sono in una sezione richiudibile. L’amministratore può attivare il proprio accesso allenatore con **Usa su questo dispositivo**. Il comando **Verifica accesso e destinazione Google** controlla il servizio senza inviare colpi. Sono riconosciuti i tab `Database_Colpi` e `Database`, con precedenza all’eventuale nome impostato in `BIATHLON_DATABASE_SHEET`.
+Il menu è diviso in tre gruppi. **Allenamento**: Nuova sessione, Atleti, Riepilogo, Statistiche. **Account**: chi è collegato, Sincronizza adesso, Gestisci allenatori (solo amministratori) e **Il mio accesso**, dove si incolla il collegamento personale e, in una sezione richiudibile, c’è la configurazione manuale. **Dispositivo**: schermo sempre acceso e **Impostazioni** (colpi per serie, colore dei colpi, backup, reset). L’amministratore può attivare il proprio accesso allenatore con **Usa su questo dispositivo**. Il comando **Verifica accesso e destinazione Google** controlla il servizio senza inviare colpi. Sono riconosciuti i tab `Database_Colpi` e `Database`, con precedenza all’eventuale nome impostato in `BIATHLON_DATABASE_SHEET`.
 
 All’avvio gli atleti sono letti dall’archivio locale, conservato per l’uso offline. Il solo link pubblico, aperto in un browser nuovo, non scarica l’anagrafica e non abilita invii. La protezione richiede che anche il deployment Google esegua il codice aggiornato.
 
